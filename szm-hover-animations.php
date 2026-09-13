@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SZM Hover Animations
  * Description: Voegt "Hover animatie" en "Entrance animatie" dropdowns toe aan de block-instellingen (site editor) van Group-, Cover-, Column- en Columns-blokken, inclusief snelheid en stagger-vertraging.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: Studio Zonder Meer
  * Text Domain: szm-hover-animations
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SZM_HA_VERSION', '1.1.0' );
+define( 'SZM_HA_VERSION', '1.2.0' );
 define( 'SZM_HA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SZM_HA_URL', plugin_dir_url( __FILE__ ) );
 
@@ -102,3 +102,22 @@ function szm_ha_enqueue_frontend_assets() {
 	);
 }
 add_action( 'wp_enqueue_scripts', 'szm_ha_enqueue_frontend_assets' );
+
+/**
+ * Self-updates through WordPress's native Plugins/Updates screen — no
+ * separate updater plugin needed. Checks the GitHub repo for new tags and
+ * shows the normal "Update available" notice, same as the other SZM plugins.
+ */
+require_once __DIR__ . '/inc/plugin-update-checker/plugin-update-checker.php';
+use YahnisElsts\PluginUpdateChecker\v5p4\PucFactory;
+add_action( 'init', function () {
+	$update_checker = PucFactory::buildUpdateChecker(
+		'https://github.com/Yelbow/szm-hover-animations',
+		__FILE__,
+		'szm-hover-animations'
+	);
+	$update_checker->setBranch( 'main' );
+	// If the repo is private, uncomment and set a fine-grained,
+	// read-only-on-this-repo GitHub access token:
+	// $update_checker->setAuthentication( 'ghp_xxxxxxxxxxxxxxxxxxxx' );
+} );

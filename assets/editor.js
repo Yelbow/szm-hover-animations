@@ -21,7 +21,7 @@
 	var ENTRANCE_OPTIONS_MAP = settings.entranceOptions || {};
 
 	var DEFAULT_HOVER_SPEED    = 250; // ms
-	var DEFAULT_ENTRANCE_SPEED = 500; // ms
+	var DEFAULT_ENTRANCE_SPEED = 800; // ms
 
 	function isHoverSupported( name ) {
 		return HOVER_BLOCKS.indexOf( name ) !== -1;
