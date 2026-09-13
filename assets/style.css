@@ -1,0 +1,52 @@
+/**
+ * SZM Hover Animations
+ * Basis-transitie + per-variant hover-effect. Werkt op elk blok dat de
+ * class "szm-hover szm-hover-{variant}" krijgt (Group/Cover/Column).
+ */
+
+.szm-hover {
+	transition: transform 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease, filter 0.25s ease;
+	will-change: transform;
+}
+
+/* Optillen: blok komt iets omhoog met zachte schaduw */
+.szm-hover-lift:hover {
+	transform: translateY(-6px);
+	box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Inzoomen */
+.szm-hover-zoom-in:hover {
+	transform: scale(1.04);
+}
+
+/* Uitzoomen (subtiel kleiner) */
+.szm-hover-zoom-out:hover {
+	transform: scale(0.97);
+}
+
+/* Vervagen */
+.szm-hover-fade:hover {
+	opacity: 0.75;
+}
+
+/* Gloed: lichte glow rondom */
+.szm-hover-glow:hover {
+	box-shadow: 0 0 24px rgba(0, 0, 0, 0.18);
+	filter: brightness(1.03);
+}
+
+/* Kantelen: lichte 3D-tilt */
+.szm-hover-tilt:hover {
+	transform: perspective(600px) rotateX(2deg) rotateY(-2deg);
+}
+
+/* Schaduw uitlichten: sterkere drop-shadow, geen verplaatsing */
+.szm-hover-shadow:hover {
+	box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+/* Editor: iframe/canvas kan overflow clippen, dit voorkomt afgekapte hover-effecten */
+.block-editor-block-list__block.szm-hover {
+	overflow: visible;
+}
