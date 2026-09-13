@@ -1,11 +1,17 @@
 /**
  * SZM Hover Animations
- * Basis-transitie + per-variant hover-effect. Werkt op elk blok dat de
- * class "szm-hover szm-hover-{variant}" krijgt (Group/Cover/Column).
+ * - Hover: basis-transitie + per-variant hover-effect, werkt op elk blok dat
+ *   de class "szm-hover szm-hover-{variant}" krijgt (Group/Cover/Column).
+ * - Entrance: fade/slide-in bij scrollen in beeld, werkt op elk blok met de
+ *   class "szm-entrance szm-entrance-{variant}"; "szm-entrance-revealed"
+ *   wordt door assets/frontend.js toegevoegd zodra het blok in beeld komt.
  */
 
 .szm-hover {
-	transition: transform 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease, filter 0.25s ease;
+	transition: transform var(--szm-hover-speed, 0.25s) ease,
+		box-shadow var(--szm-hover-speed, 0.25s) ease,
+		opacity var(--szm-hover-speed, 0.25s) ease,
+		filter var(--szm-hover-speed, 0.25s) ease;
 	will-change: transform;
 }
 
@@ -49,4 +55,42 @@
 /* Editor: iframe/canvas kan overflow clippen, dit voorkomt afgekapte hover-effecten */
 .block-editor-block-list__block.szm-hover {
 	overflow: visible;
+}
+
+/**
+ * Entrance animaties.
+ */
+.szm-entrance {
+	transition: opacity var(--szm-entrance-speed, 0.5s) ease,
+		transform var(--szm-entrance-speed, 0.5s) ease;
+	transition-delay: var(--szm-entrance-delay, 0s);
+	opacity: 0;
+	will-change: opacity, transform;
+}
+
+.szm-entrance-fade-in {
+	transform: none;
+}
+
+.szm-entrance-slide-up {
+	transform: translateY(32px);
+}
+
+.szm-entrance-revealed {
+	opacity: 1;
+	transform: none;
+}
+
+/* Verminderde beweging: direct tonen, geen animatie/vertraging. */
+@media (prefers-reduced-motion: reduce) {
+	.szm-entrance {
+		transition-duration: 0s;
+		transition-delay: 0s;
+	}
+}
+
+/* Editor: nooit onzichtbaar tijdens bewerken, ongeacht revealed-status. */
+.block-editor-block-list__block.szm-entrance {
+	opacity: 1 !important;
+	transform: none !important;
 }

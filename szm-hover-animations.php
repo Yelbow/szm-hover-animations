@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: SZM Hover Animations
- * Description: Voegt een "Hover animatie" dropdown toe aan de block-instellingen (site editor) van Group- en Cover-blokken, voor kaart/groep hover-effecten.
- * Version: 1.0.0
+ * Description: Voegt "Hover animatie" en "Entrance animatie" dropdowns toe aan de block-instellingen (site editor) van Group-, Cover-, Column- en Columns-blokken, inclusief snelheid en stagger-vertraging.
+ * Version: 1.1.0
  * Author: Studio Zonder Meer
  * Text Domain: szm-hover-animations
  */
@@ -11,12 +11,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SZM_HA_VERSION', '1.0.0' );
+define( 'SZM_HA_VERSION', '1.1.0' );
 define( 'SZM_HA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SZM_HA_URL', plugin_dir_url( __FILE__ ) );
 
 /**
- * Welke animaties zijn beschikbaar. value = ook de opgeslagen attribute-waarde
+ * Welke hover-animaties zijn beschikbaar. value = ook de opgeslagen attribute-waarde
  * en de class-suffix (szm-hover-{value}). Pas hier aan om opties toe te voegen/verwijderen.
  */
 function szm_ha_get_animations() {
@@ -33,10 +33,22 @@ function szm_ha_get_animations() {
 }
 
 /**
- * Editor-script: voegt attribute, inspector-dropdown en editor-preview class toe.
+ * Welke entrance-animaties (bij scrollen in beeld) beschikbaar zijn. value = ook de
+ * opgeslagen attribute-waarde en de class-suffix (szm-entrance-{value}).
+ */
+function szm_ha_get_entrance_animations() {
+	return array(
+		''          => __( 'Geen', 'szm-hover-animations' ),
+		'fade-in'   => __( 'Fade in', 'szm-hover-animations' ),
+		'slide-up'  => __( 'Op laten schuiven', 'szm-hover-animations' ),
+	);
+}
+
+/**
+ * Editor-script: voegt attributes, inspector-dropdowns en editor-preview classes toe.
  */
 function szm_ha_enqueue_editor_assets() {
-	$deps = array( 'wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-hooks', 'wp-i18n', 'wp-compose' );
+	$deps = array( 'wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-hooks', 'wp-i18n', 'wp-compose', 'wp-data' );
 
 	wp_enqueue_script(
 		'szm-ha-editor',
@@ -50,9 +62,12 @@ function szm_ha_enqueue_editor_assets() {
 		'szm-ha-editor',
 		'szmHoverAnimations',
 		array(
-			'options' => szm_ha_get_animations(),
-			// Welke blokken de dropdown krijgen. Uitbreidbaar via de php-filter hieronder.
-			'blocks'  => apply_filters( 'szm_ha_supported_blocks', array( 'core/group', 'core/cover', 'core/column' ) ),
+			'options'         => szm_ha_get_animations(),
+			'entranceOptions' => szm_ha_get_entrance_animations(),
+			// Welke blokken de hover-dropdown krijgen. Uitbreidbaar via de php-filter hieronder.
+			'blocks'          => apply_filters( 'szm_ha_supported_blocks', array( 'core/group', 'core/cover', 'core/column' ) ),
+			// Welke blokken de entrance-dropdown (+ snelheid/stagger) krijgen.
+			'entranceBlocks'  => apply_filters( 'szm_ha_supported_entrance_blocks', array( 'core/group', 'core/cover', 'core/column', 'core/columns' ) ),
 		)
 	);
 
@@ -66,7 +81,9 @@ function szm_ha_enqueue_editor_assets() {
 add_action( 'enqueue_block_editor_assets', 'szm_ha_enqueue_editor_assets' );
 
 /**
- * Front-end: dezelfde animatie-CSS laden zodat de hover ook op de live site werkt.
+ * Front-end: dezelfde animatie-CSS laden zodat de hover en entrance-animaties
+ * ook op de live site werken, plus het script dat entrance-animaties triggert
+ * zodra een blok in beeld scrollt.
  */
 function szm_ha_enqueue_frontend_assets() {
 	wp_enqueue_style(
@@ -74,6 +91,14 @@ function szm_ha_enqueue_frontend_assets() {
 		SZM_HA_URL . 'assets/style.css',
 		array(),
 		SZM_HA_VERSION
+	);
+
+	wp_enqueue_script(
+		'szm-ha-frontend',
+		SZM_HA_URL . 'assets/frontend.js',
+		array(),
+		SZM_HA_VERSION,
+		true
 	);
 }
 add_action( 'wp_enqueue_scripts', 'szm_ha_enqueue_frontend_assets' );
