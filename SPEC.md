@@ -25,3 +25,7 @@ User's own words, verbatim, from the 2026-09-13/14 session. Not paraphrased or i
 > 8, 10 en 12 werken niet op mobiel voor mij
 
 > Everything that has mouse actions attached needs to have an alternative for mobile devices. (This needs to be in spec as well)
+
+## 2026-09-14 (vervolg)
+
+> check studiozondermeer.nl on the homepage i made a different kind of gsap animations i want to have included in the plugin is wel. make sure there are no block recovery errors in wp admin. and also you are allowed to impeove my version as long as the design stays good.

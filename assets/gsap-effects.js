@@ -1,9 +1,11 @@
 /**
  * SZM Hover Animations — GSAP module.
  *
- * Ten GSAP-powered behaviours, purely driven by data-attributes that
+ * GSAP-powered behaviours, purely driven by data-attributes that
  * assets/editor.js writes onto the saved block markup — no new blocks:
  * - Slider: turns a Columns block's columns into a swipeable/autoplay slider.
+ * - Process steps: pins a Columns block while its second column's direct
+ *   children collapse one by one, sticky-scrollytelling style.
  * - Accordion: turns a Group block's direct children into collapsible panels.
  * - Horizontal scroll: pins a Group and scrolls its children sideways.
  * - Video: parallax / reveal / play-on-scroll effects on Video and Cover blocks.
@@ -227,6 +229,133 @@
 
 			goTo( 0, false );
 			startAutoplay();
+		} );
+	}
+
+	/**
+	 * Sticky process steps: applies to .szm-gsap-process (core/columns).
+	 * First direct column = sticky image/media side, second direct column =
+	 * steps; each direct child block of that second column is one step,
+	 * whose first element stays visible as the "header" and the rest
+	 * collapses to height 0 as the next step scrolls into place — the whole
+	 * block pins while that happens. Ported from studiozondermeer.nl's own
+	 * hand-written theme GSAP (a pinned, gsap.matchMedia-driven timeline)
+	 * into a reusable Inspector toggle. Desktop pins the whole block;
+	 * mobile pins only the text column instead (image column has no room
+	 * to stay beside it once columns stack), matching the original.
+	 */
+	function initProcessSteps() {
+		if ( prefersReducedMotion || ! window.ScrollTrigger ) {
+			return;
+		}
+
+		document.querySelectorAll( '.szm-gsap-process' ).forEach( function ( container ) {
+			var columns = Array.prototype.slice.call( container.children ).filter( function ( child ) {
+				return child.nodeType === 1;
+			} );
+
+			if ( columns.length < 2 ) {
+				return;
+			}
+
+			var imageSide = columns[ 0 ];
+			var textSide  = columns[ 1 ];
+			var items = Array.prototype.slice.call( textSide.children ).filter( function ( child ) {
+				return child.nodeType === 1;
+			} );
+
+			if ( items.length < 2 ) {
+				return;
+			}
+
+			container.classList.add( 'szm-gsap-process--ready' );
+
+			var contents = items.map( function ( item ) {
+				item.classList.add( 'szm-gsap-process-item' );
+				var header = item.firstElementChild;
+				if ( ! header ) {
+					return null;
+				}
+				var content = document.createElement( 'div' );
+				content.className = 'szm-gsap-process-content';
+				Array.prototype.slice.call( item.children ).slice( 1 ).forEach( function ( node ) {
+					content.appendChild( node );
+				} );
+				item.appendChild( content );
+				return content;
+			} );
+
+			// Scroll distance the pin holds for: one full viewport height per
+			// step that has to collapse. Using a fixed "+=Npx" formula instead
+			// of the original theme code's "end: 'bottom bottom'" — that only
+			// gives a usable scrub range when the *uncollapsed* content happens
+			// to be taller than one viewport, so with shorter step text (the
+			// common case for arbitrary editor content) it snapped shut almost
+			// instantly. Same fix pattern as initFullpage()'s pin distance.
+			var scrollDistance = '+=' + Math.max( 1, items.length - 1 ) * 100 + '%';
+
+			function buildTimeline( scrollTriggerVars ) {
+				var tl = gsap.timeline( { scrollTrigger: scrollTriggerVars } );
+				items.forEach( function ( item, i ) {
+					if ( i === items.length - 1 || ! contents[ i ] ) {
+						return;
+					}
+					tl.to( item, { marginBottom: 0, duration: 1, ease: 'none' } )
+						.to( contents[ i ], { height: 0, duration: 1, ease: 'none' }, '-=0.3' );
+				} );
+				return tl;
+			}
+
+			var mm = gsap.matchMedia();
+
+			// Desktop: pin the whole block (image column stays put beside the
+			// collapsing text column).
+			mm.add( '(min-width: 800px)', function () {
+				buildTimeline( {
+					trigger: container,
+					start: 'top 80px',
+					end: scrollDistance,
+					pin: true,
+					pinSpacing: false,
+					scrub: 1,
+					anticipatePin: 1,
+					invalidateOnRefresh: true,
+				} );
+
+				// gsap.matchMedia runs this cleanup automatically once the media
+				// query stops matching (e.g. window resized past 800px) — undoes
+				// the marginBottom/height tweens so a later resize starts clean.
+				return function () {
+					gsap.set( items, { clearProps: 'marginBottom' } );
+					gsap.set( contents.filter( Boolean ), { clearProps: 'height' } );
+				};
+			} );
+
+			// Mobiel: WP core stacks the columns, so pin the text column itself
+			// instead and lift it above the (now full-width, behind) image column.
+			mm.add( '(max-width: 799px)', function () {
+				gsap.set( textSide, { position: 'relative', zIndex: 10 } );
+				gsap.set( imageSide, { zIndex: 1 } );
+
+				buildTimeline( {
+					trigger: textSide,
+					start: 'top 40px',
+					end: scrollDistance,
+					pin: true,
+					pinSpacing: false,
+					scrub: 1,
+					anticipatePin: 1,
+					invalidateOnRefresh: true,
+					refreshPriority: 1,
+				} );
+
+				return function () {
+					gsap.set( textSide, { clearProps: 'position,zIndex' } );
+					gsap.set( imageSide, { clearProps: 'zIndex' } );
+					gsap.set( items, { clearProps: 'marginBottom' } );
+					gsap.set( contents.filter( Boolean ), { clearProps: 'height' } );
+				};
+			} );
 		} );
 	}
 
@@ -765,6 +894,7 @@
 
 	function init() {
 		initSliders();
+		initProcessSteps();
 		initAccordions();
 		initHorizontalScroll();
 		initFullpage();

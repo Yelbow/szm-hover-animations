@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: SZM Hover Animations
- * Description: Voegt "Hover animatie" en "Entrance animatie" dropdowns toe aan de block-instellingen (site editor), plus een volledige GSAP-module: slider (Columns), accordion (Group), horizontal scroll (Group), full-viewport scroll slides (Group), video parallax/reveal/play-on-scroll/scrub (Video/Cover), tekst-reveal met SplitText (Heading/Paragraph), animated counters (Heading), magnetic button (Button) en infinite marquee (List). Alles mobiel-getest, allemaal gegraft op bestaande core-blokken — geen nieuwe blokken.
- * Version: 1.6.0
+ * Description: Voegt "Hover animatie" en "Entrance animatie" dropdowns toe aan de block-instellingen (site editor), plus een volledige GSAP-module: slider (Columns), sticky process-stappen (Columns), accordion (Group), horizontal scroll (Group), full-viewport scroll slides (Group), video parallax/reveal/play-on-scroll/scrub (Video/Cover), tekst-reveal met SplitText (Heading/Paragraph), animated counters (Heading), magnetic button (Button) en infinite marquee (List). Alles mobiel-getest, allemaal gegraft op bestaande core-blokken — geen nieuwe blokken.
+ * Version: 1.7.0
  * Author: Studio Zonder Meer
  * Text Domain: szm-hover-animations
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SZM_HA_VERSION', '1.6.0' );
+define( 'SZM_HA_VERSION', '1.7.0' );
 define( 'SZM_HA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SZM_HA_URL', plugin_dir_url( __FILE__ ) );
 
@@ -100,6 +100,13 @@ function szm_ha_enqueue_editor_assets() {
 			'gsapVideoOptions' => szm_ha_get_gsap_video_effects(),
 			// Welk blok slider-gedrag krijgt (kolommen worden slides).
 			'gsapSliderBlocks' => apply_filters( 'szm_ha_gsap_slider_blocks', array( 'core/columns' ) ),
+			// Sticky process-stappen: eerste kolom blijft (gepind) staan, de directe
+			// kind-blokken van de tweede kolom klappen één voor één in tijdens
+			// scrollen. Zelfde patroon als de handgeschreven GSAP-scrollytelling-
+			// sectie op studiozondermeer.nl zelf, nu als generieke Inspector-toggle.
+			// Sluit uit met de slider hierboven op hetzelfde blok — bij beide aan
+			// wint de slider (zie withAnimationControls/addSaveProps in editor.js).
+			'gsapProcessBlocks' => apply_filters( 'szm_ha_gsap_process_blocks', array( 'core/columns' ) ),
 			// Welk blok accordion-gedrag krijgt (directe kind-blokken worden panels).
 			'gsapAccordionBlocks' => apply_filters( 'szm_ha_gsap_accordion_blocks', array( 'core/group' ) ),
 			// Welke blokken video-effecten krijgen.

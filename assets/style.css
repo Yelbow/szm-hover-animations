@@ -235,6 +235,23 @@
 	flex-basis: auto;
 }
 
+/* Sticky process-stappen (core/columns). Geen "voordat gsap-effects.js klaar
+   is"-fallback nodig zoals bij slider/accordion/fullpage: er wordt niets
+   verborgen of gestapeld voordat de JS draait, items staan gewoon normaal
+   onder elkaar totdat ScrollTrigger ze begint te pinnen/inklappen. */
+.szm-gsap-process-content {
+	overflow: hidden;
+}
+
+.szm-gsap-process-item {
+	border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Editor: altijd volledig getoond, pin/inklap-interactie is alleen front-end. */
+.block-editor-block-list__block.szm-gsap-process .szm-gsap-process-content {
+	height: auto !important;
+}
+
 /* Accordion (core/group). */
 .szm-gsap-accordion-item {
 	border-bottom: 1px solid rgba(0, 0, 0, 0.1);

@@ -23,6 +23,7 @@
 
 	// GSAP-module: geen nieuwe blokken, gedrag toegevoegd aan bestaande blokken.
 	var GSAP_SLIDER_BLOCKS    = settings.gsapSliderBlocks || [];
+	var GSAP_PROCESS_BLOCKS   = settings.gsapProcessBlocks || [];
 	var GSAP_ACCORDION_BLOCKS = settings.gsapAccordionBlocks || [];
 	var GSAP_VIDEO_BLOCKS     = settings.gsapVideoBlocks || [];
 	var GSAP_VIDEO_OPTIONS_MAP = settings.gsapVideoOptions || {};
@@ -56,6 +57,10 @@
 
 	function isSliderSupported( name ) {
 		return GSAP_SLIDER_BLOCKS.indexOf( name ) !== -1;
+	}
+
+	function isGsapProcessSupported( name ) {
+		return GSAP_PROCESS_BLOCKS.indexOf( name ) !== -1;
 	}
 
 	function isAccordionSupported( name ) {
@@ -142,6 +147,12 @@
 			extra.szmGsapSliderSpeed        = { type: 'number', default: DEFAULT_SLIDER_SPEED };
 		}
 
+		if ( isGsapProcessSupported( name ) ) {
+			// Sluit elkaar uit met szmGsapSlider op hetzelfde blok (core/columns);
+			// als beide aan staan wint de slider, zie addSaveProps.
+			extra.szmGsapProcess = { type: 'boolean', default: false };
+		}
+
 		if ( isAccordionSupported( name ) ) {
 			extra.szmGsapAccordion            = { type: 'boolean', default: false };
 			extra.szmGsapAccordionSpeed       = { type: 'number', default: DEFAULT_ACCORDION_SPEED };
@@ -217,6 +228,7 @@
 			var showHover      = isHoverSupported( name );
 			var showEntrance   = isEntranceSupported( name );
 			var showSlider     = isSliderSupported( name );
+			var showGsapProcess = isGsapProcessSupported( name );
 			var showAccordion  = isAccordionSupported( name );
 			var showGsapVideo  = isGsapVideoSupported( name );
 			var showGsapText   = isGsapTextSupported( name );
@@ -266,7 +278,7 @@
 				// eslint-disable-next-line
 			}, [ computedDelay, showEntrance ] );
 
-			if ( ! showHover && ! showEntrance && ! showSlider && ! showAccordion && ! showGsapVideo &&
+			if ( ! showHover && ! showEntrance && ! showSlider && ! showGsapProcess && ! showAccordion && ! showGsapVideo &&
 				! showGsapText && ! showGsapCounter && ! showGsapMagnetic && ! showGsapHorizontal &&
 				! showGsapFullpage && ! showGsapMarquee ) {
 				return el( BlockEdit, props );
@@ -378,6 +390,18 @@
 							min: 1500,
 							max: 10000,
 							step: 500,
+						} )
+					),
+					showGsapProcess && el(
+						PanelBody,
+						{ title: __( 'GSAP: Sticky process-stappen', 'szm-hover-animations' ), initialOpen: false },
+						el( ToggleControl, {
+							label: __( 'Kolommen als sticky proces-stappen tonen', 'szm-hover-animations' ),
+							help: __( 'Eerste kolom (bv. afbeelding) blijft vastgepind staan terwijl de directe kind-blokken in de tweede kolom één voor één inklappen — het eerste element van elk kind-blok blijft de kop, de rest is de inklappende inhoud (bekend van "hoe werkt het"-secties). Sluit elkaar uit met de slider hierboven op hetzelfde blok — staat die ook aan, dan wint de slider. Niet live zichtbaar in de editor, alleen op de front-end/preview.', 'szm-hover-animations' ),
+							checked: !! attributes.szmGsapProcess,
+							onChange: function ( value ) {
+								setAttributes( { szmGsapProcess: value } );
+							},
 						} )
 					),
 					showAccordion && el(
@@ -630,6 +654,12 @@
 			extraProps[ 'data-szm-slider-autoplay' ]       = !! attributes.szmGsapSliderAutoplay;
 			extraProps[ 'data-szm-slider-autoplay-speed' ] = attributes.szmGsapSliderAutoplaySpeed || DEFAULT_SLIDER_AUTOPLAY_SPEED;
 			extraProps[ 'data-szm-slider-loop' ]           = attributes.szmGsapSliderLoop !== false;
+		}
+
+		// Sticky process-stappen sluit de slider hierboven uit op hetzelfde blok
+		// (core/columns) — bij beide aan wint de slider.
+		if ( isGsapProcessSupported( blockType.name ) && attributes.szmGsapProcess && ! attributes.szmGsapSlider ) {
+			classes.push( 'szm-gsap-process' );
 		}
 
 		if ( isAccordionSupported( blockType.name ) && attributes.szmGsapAccordion ) {
