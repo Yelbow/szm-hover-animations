@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: SZM Hover Animations
- * Description: Voegt "Hover animatie" en "Entrance animatie" dropdowns toe aan de block-instellingen (site editor) van Group-, Cover-, Column- en Columns-blokken, inclusief snelheid en stagger-vertraging.
- * Version: 1.2.1
+ * Description: Voegt "Hover animatie" en "Entrance animatie" dropdowns toe aan de block-instellingen (site editor), plus een volledige GSAP-module: slider (Columns), accordion (Group), horizontal scroll (Group), full-viewport scroll slides (Group), video parallax/reveal/play-on-scroll/scrub (Video/Cover), tekst-reveal met SplitText (Heading/Paragraph), animated counters (Heading), magnetic button (Button) en infinite marquee (List). Alles mobiel-getest, allemaal gegraft op bestaande core-blokken — geen nieuwe blokken.
+ * Version: 1.6.0
  * Author: Studio Zonder Meer
  * Text Domain: szm-hover-animations
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SZM_HA_VERSION', '1.2.1' );
+define( 'SZM_HA_VERSION', '1.6.0' );
 define( 'SZM_HA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SZM_HA_URL', plugin_dir_url( __FILE__ ) );
 
@@ -45,6 +45,34 @@ function szm_ha_get_entrance_animations() {
 }
 
 /**
+ * Welke video-effecten (GSAP) beschikbaar zijn voor Video/Cover-blokken.
+ * value = ook de opgeslagen attribute-waarde en de class-suffix (szm-gsap-video-{value}).
+ */
+function szm_ha_get_gsap_video_effects() {
+	return array(
+		''               => __( 'Geen', 'szm-hover-animations' ),
+		'parallax'       => __( 'Parallax (bij scrollen)', 'szm-hover-animations' ),
+		'reveal'         => __( 'Inzoomen bij in beeld komen', 'szm-hover-animations' ),
+		'play-on-scroll' => __( 'Afspelen/pauzeren bij in/uit beeld', 'szm-hover-animations' ),
+		'scrub'          => __( 'Scrollen = afspelen (filmstrook, gepind)', 'szm-hover-animations' ),
+	);
+}
+
+/**
+ * Welke tekst-reveal varianten (GSAP SplitText) beschikbaar zijn voor
+ * Heading/Paragraph-blokken. value = ook de opgeslagen attribute-waarde en
+ * de class-suffix (szm-gsap-text-{value}).
+ */
+function szm_ha_get_gsap_text_effects() {
+	return array(
+		''       => __( 'Geen', 'szm-hover-animations' ),
+		'chars'  => __( 'Per letter', 'szm-hover-animations' ),
+		'words'  => __( 'Per woord', 'szm-hover-animations' ),
+		'lines'  => __( 'Per regel', 'szm-hover-animations' ),
+	);
+}
+
+/**
  * Editor-script: voegt attributes, inspector-dropdowns en editor-preview classes toe.
  */
 function szm_ha_enqueue_editor_assets() {
@@ -68,6 +96,31 @@ function szm_ha_enqueue_editor_assets() {
 			'blocks'          => apply_filters( 'szm_ha_supported_blocks', array( 'core/group', 'core/cover', 'core/column' ) ),
 			// Welke blokken de entrance-dropdown (+ snelheid/stagger) krijgen.
 			'entranceBlocks'  => apply_filters( 'szm_ha_supported_entrance_blocks', array( 'core/group', 'core/cover', 'core/column', 'core/columns' ) ),
+			// GSAP-module: geen nieuwe blokken, gedrag toegevoegd aan bestaande blokken.
+			'gsapVideoOptions' => szm_ha_get_gsap_video_effects(),
+			// Welk blok slider-gedrag krijgt (kolommen worden slides).
+			'gsapSliderBlocks' => apply_filters( 'szm_ha_gsap_slider_blocks', array( 'core/columns' ) ),
+			// Welk blok accordion-gedrag krijgt (directe kind-blokken worden panels).
+			'gsapAccordionBlocks' => apply_filters( 'szm_ha_gsap_accordion_blocks', array( 'core/group' ) ),
+			// Welke blokken video-effecten krijgen.
+			'gsapVideoBlocks'  => apply_filters( 'szm_ha_gsap_video_blocks', array( 'core/video', 'core/cover' ) ),
+			// Tekst-reveal (SplitText): welke blokken de dropdown krijgen.
+			'gsapTextOptions'  => szm_ha_get_gsap_text_effects(),
+			'gsapTextBlocks'   => apply_filters( 'szm_ha_gsap_text_blocks', array( 'core/heading', 'core/paragraph' ) ),
+			// Animated counters: alleen Heading (getal in de tekst wordt geteld).
+			'gsapCounterBlocks' => apply_filters( 'szm_ha_gsap_counter_blocks', array( 'core/heading' ) ),
+			// Magnetic button: cursor-volgend knop-effect.
+			'gsapMagneticBlocks' => apply_filters( 'szm_ha_gsap_magnetic_blocks', array( 'core/button' ) ),
+			// Horizontal scroll: Group met vastgepinde horizontale scroll door de kinderen.
+			// Let op: sluit elkaar uit met de accordion-toggle op hetzelfde blok; als beide aan
+			// staan wint de accordion (zie withAnimationControls in editor.js).
+			'gsapHorizontalBlocks' => apply_filters( 'szm_ha_gsap_horizontal_blocks', array( 'core/group' ) ),
+			// Full-viewport scroll slides: Group waarvan de kinderen elk een volledig
+			// scherm innemen en in elkaar overvloeien. Sluit ook uit met accordion én
+			// horizontal scroll op hetzelfde blok (prioriteit: accordion > horizontal > fullpage).
+			'gsapFullpageBlocks' => apply_filters( 'szm_ha_gsap_fullpage_blocks', array( 'core/group' ) ),
+			// Infinite marquee: List-items schuiven eindeloos door.
+			'gsapMarqueeBlocks' => apply_filters( 'szm_ha_gsap_marquee_blocks', array( 'core/list' ) ),
 		)
 	);
 
@@ -100,6 +153,42 @@ function szm_ha_enqueue_frontend_assets() {
 		SZM_HA_VERSION,
 		true
 	);
+
+	// GSAP-module (slider/accordion/video). Vendored locally, geen CDN-afhankelijkheid.
+	// Filterbaar zodat een site die geen van deze effecten gebruikt het kan uitschakelen.
+	if ( apply_filters( 'szm_ha_load_gsap', true ) ) {
+		wp_enqueue_script(
+			'szm-ha-gsap',
+			SZM_HA_URL . 'assets/vendor/gsap/gsap.min.js',
+			array(),
+			'3.15.0',
+			true
+		);
+
+		wp_enqueue_script(
+			'szm-ha-gsap-scrolltrigger',
+			SZM_HA_URL . 'assets/vendor/gsap/ScrollTrigger.min.js',
+			array( 'szm-ha-gsap' ),
+			'3.15.0',
+			true
+		);
+
+		wp_enqueue_script(
+			'szm-ha-gsap-splittext',
+			SZM_HA_URL . 'assets/vendor/gsap/SplitText.min.js',
+			array( 'szm-ha-gsap' ),
+			'3.15.0',
+			true
+		);
+
+		wp_enqueue_script(
+			'szm-ha-gsap-effects',
+			SZM_HA_URL . 'assets/gsap-effects.js',
+			array( 'szm-ha-gsap', 'szm-ha-gsap-scrolltrigger', 'szm-ha-gsap-splittext' ),
+			SZM_HA_VERSION,
+			true
+		);
+	}
 }
 add_action( 'wp_enqueue_scripts', 'szm_ha_enqueue_frontend_assets' );
 

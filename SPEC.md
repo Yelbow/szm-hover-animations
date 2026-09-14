@@ -17,3 +17,11 @@ User's own words, verbatim, from the 2026-09-13/14 session. Not paraphrased or i
 > why dont i see the pages youve mad ein my pagse tab in wp admin?
 
 > don't forget to write my actual wishes from this chat in a spec
+
+> okay bro research the 10 most popular and amazing use cases of gsap. install those in our plugin in site editor for core blocks and show me a stunning demo of those
+
+> check on mobile because it doesn't work well there it needs to be responsive and correct on all devices. besides that i am missing the full viewport scroll trigger slides. and i am missing the scrolling through a video on scroll (as if it is an animation)
+
+> 8, 10 en 12 werken niet op mobiel voor mij
+
+> Everything that has mouse actions attached needs to have an alternative for mobile devices. (This needs to be in spec as well)

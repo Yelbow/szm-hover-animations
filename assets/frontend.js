@@ -1,10 +1,16 @@
 /**
- * SZM Hover Animations — front-end entrance trigger.
+ * SZM Hover Animations — front-end entrance trigger + touch alternative for hover.
  *
- * Voegt de class "szm-entrance-revealed" toe zodra een blok met de class
- * "szm-entrance" in beeld scrollt, zodat de fade/slide-in CSS in style.css
- * kan animeren. Hover-animaties hebben dit script niet nodig (pure CSS
- * ":hover"); dit script gaat alleen over entrance-animaties.
+ * Twee dingen, allebei zonder GSAP-afhankelijkheid (dit script laadt altijd,
+ * ook als de "szm_ha_load_gsap" filter uit staat):
+ * - Entrance: voegt "szm-entrance-revealed" toe zodra een blok met de class
+ *   "szm-entrance" in beeld scrollt, zodat de fade/slide-in CSS kan animeren.
+ * - Hover-op-touch: ":hover" bestaat niet op een touchscreen, dus tikken op
+ *   een ".szm-hover"-blok deed op mobiel niets. Voegt op "touchstart" de
+ *   class "szm-hover-touch-active" toe (die de ":hover"-CSS in style.css ook
+ *   matcht — zie de comments daar), en verwijdert die weer na een korte
+ *   pauze zodat de gebruiker het effect echt ziet spelen, als een bewuste
+ *   "tik om te bekijken"-actie i.p.v. een blijvend vastzittende hover-state.
  */
 ( function () {
 	function revealImmediately( elements ) {
@@ -13,7 +19,38 @@
 		}
 	}
 
+	function initHoverTouchAlternative() {
+		var elements = document.querySelectorAll( '.szm-hover' );
+		if ( ! elements.length || ! ( 'ontouchstart' in window || navigator.maxTouchPoints > 0 ) ) {
+			return;
+		}
+
+		var prefersReducedMotion = window.matchMedia && window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
+		var activeTimer = null;
+
+		elements.forEach ? elements.forEach( bind ) : Array.prototype.forEach.call( elements, bind );
+
+		function bind( el ) {
+			el.addEventListener( 'touchstart', function () {
+				if ( prefersReducedMotion ) {
+					return;
+				}
+				window.clearTimeout( activeTimer );
+				el.classList.add( 'szm-hover-touch-active' );
+				// Zelf weer verwijderen na een korte "preview"-pauze — geen
+				// touchend/touchcancel nodig, en werkt ook als de vinger
+				// wegschuift naar scrollen (touchend zou dan niet op dit
+				// element vuren).
+				activeTimer = window.setTimeout( function () {
+					el.classList.remove( 'szm-hover-touch-active' );
+				}, 600 );
+			}, { passive: true } );
+		}
+	}
+
 	function init() {
+		initHoverTouchAlternative();
+
 		var elements = document.querySelectorAll( '.szm-entrance' );
 		if ( ! elements.length ) {
 			return;

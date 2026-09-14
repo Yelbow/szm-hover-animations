@@ -5,6 +5,10 @@
  * - Entrance: fade/slide-in bij scrollen in beeld, werkt op elk blok met de
  *   class "szm-entrance szm-entrance-{variant}"; "szm-entrance-revealed"
  *   wordt door assets/frontend.js toegevoegd zodra het blok in beeld komt.
+ * - Mobiel/touch heeft geen ":hover" — frontend.js voegt op "touchstart" de
+ *   class "szm-hover-touch-active" toe (en verwijdert die na een korte pauze),
+ *   zodat elk hover-effect hieronder ook een tap-alternatief heeft. Vandaar
+ *   dat elke regel hier zowel ":hover" als ".szm-hover-touch-active" matcht.
  */
 
 .szm-hover {
@@ -16,39 +20,46 @@
 }
 
 /* Optillen: blok komt iets omhoog met zachte schaduw */
-.szm-hover-lift:hover {
+.szm-hover-lift:hover,
+.szm-hover-lift.szm-hover-touch-active {
 	transform: translateY(-6px);
 	box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
 }
 
 /* Inzoomen */
-.szm-hover-zoom-in:hover {
+.szm-hover-zoom-in:hover,
+.szm-hover-zoom-in.szm-hover-touch-active {
 	transform: scale(1.04);
 }
 
 /* Uitzoomen (subtiel kleiner) */
-.szm-hover-zoom-out:hover {
+.szm-hover-zoom-out:hover,
+.szm-hover-zoom-out.szm-hover-touch-active {
 	transform: scale(0.97);
 }
 
 /* Vervagen */
-.szm-hover-fade:hover {
+.szm-hover-fade:hover,
+.szm-hover-fade.szm-hover-touch-active {
 	opacity: 0.75;
 }
 
 /* Gloed: lichte glow rondom */
-.szm-hover-glow:hover {
+.szm-hover-glow:hover,
+.szm-hover-glow.szm-hover-touch-active {
 	box-shadow: 0 0 24px rgba(0, 0, 0, 0.18);
 	filter: brightness(1.03);
 }
 
 /* Kantelen: lichte 3D-tilt */
-.szm-hover-tilt:hover {
+.szm-hover-tilt:hover,
+.szm-hover-tilt.szm-hover-touch-active {
 	transform: perspective(600px) rotateX(2deg) rotateY(-2deg);
 }
 
 /* Schaduw uitlichten: sterkere drop-shadow, geen verplaatsing */
-.szm-hover-shadow:hover {
+.szm-hover-shadow:hover,
+.szm-hover-shadow.szm-hover-touch-active {
 	box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
 
@@ -127,5 +138,225 @@
 /* Editor: nooit onzichtbaar tijdens bewerken, ongeacht revealed-status. */
 .block-editor-block-list__block.szm-entrance {
 	opacity: 1 !important;
+	transform: none !important;
+}
+
+/**
+ * GSAP-module: slider, accordion en video-effecten. Deze werken met JS
+ * (assets/gsap-effects.js), CSS hier is vooral structuur (layout tijdens
+ * en vóór init) en editor-fallbacks.
+ */
+
+/* Slider (core/columns). */
+.szm-gsap-slider-wrapper {
+	position: relative;
+	overflow: hidden;
+}
+
+.szm-gsap-slider {
+	display: flex !important;
+	flex-wrap: nowrap !important;
+	/* !important nodig: WP core stapelt .wp-block-columns onder 599px door
+	   flex-direction naar column te zetten (zie is-not-stacked-on-mobile).
+	   Zonder deze regel stonden de "slides" op mobiel onder elkaar i.p.v.
+	   naast elkaar, en liet de translateX-gestuurde slider alleen de
+	   bovenste ~280px van de gestapelde kolommen zien. */
+	flex-direction: row !important;
+}
+
+/* !important nodig: thema's eigen column-layout CSS (bv. Twenty Twenty-Five)
+   zet flex-basis:0 op .wp-block-column met dezelfde specificiteit en wint
+   op broncode-volgorde, waardoor alle "slides" naast elkaar bleven staan
+   i.p.v. één voor één te tonen. Ook op mobiel: WP core's mobile-stacking
+   CSS zet width/flex-basis:100% op dezelfde manier, dus dat blijft toevallig
+   correct, maar flex-direction (hierboven) moest nog wel overruled worden. */
+.szm-gsap-slider .szm-gsap-slide {
+	flex: 0 0 100% !important;
+	width: 100% !important;
+	min-width: 0;
+}
+
+@media (max-width: 599px) {
+	.szm-gsap-slider {
+		flex-direction: row !important;
+	}
+}
+
+.szm-gsap-slider-arrow {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	z-index: 2;
+	width: 40px;
+	height: 40px;
+	border: none;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.5);
+	color: #fff;
+	font-size: 22px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.szm-gsap-slider-prev {
+	left: 12px;
+}
+
+.szm-gsap-slider-next {
+	right: 12px;
+}
+
+.szm-gsap-slider-dots {
+	position: absolute;
+	bottom: 12px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 2;
+	display: flex;
+	gap: 8px;
+}
+
+.szm-gsap-slider-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	border: none;
+	background: rgba(255, 255, 255, 0.6);
+	cursor: pointer;
+	padding: 0;
+}
+
+.szm-gsap-slider-dot.is-active {
+	background: #fff;
+}
+
+/* Voordat gsap-effects.js klaar is: alle slides gestapeld tonen i.p.v. side-by-side. */
+.szm-gsap-slider:not(.szm-gsap-slider--ready) .szm-gsap-slide {
+	flex-basis: auto;
+}
+
+/* Accordion (core/group). */
+.szm-gsap-accordion-item {
+	border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.szm-gsap-accordion-trigger {
+	cursor: pointer;
+}
+
+.szm-gsap-accordion-content {
+	overflow: hidden;
+}
+
+/* Editor: altijd volledig getoond, klikinteractie is alleen front-end. */
+.block-editor-block-list__block.szm-gsap-accordion .szm-gsap-accordion-content {
+	height: auto !important;
+}
+
+/* Video-effecten (core/video, core/cover). */
+.szm-gsap-video-parallax video,
+.szm-gsap-video-reveal video {
+	will-change: transform, opacity;
+}
+
+/* Tekst-reveal (SplitText, core/heading, core/paragraph). SplitText's "mask"
+   option wraps each char/word/line in its own overflow-hidden span, so no
+   extra CSS is needed here beyond letting the wrapper clip cleanly. */
+.szm-gsap-text {
+	overflow: visible;
+}
+
+/* Animated counter (core/heading): no layout CSS needed, tabular-nums keeps
+   the digits from jittering the heading's width while counting up. */
+.szm-gsap-counter {
+	font-variant-numeric: tabular-nums;
+}
+
+/* Magnetic button (core/button). */
+.szm-gsap-magnetic .wp-block-button__link {
+	display: inline-block;
+	will-change: transform;
+}
+
+/* Horizontal scroll (core/group). */
+.szm-gsap-horizontal {
+	overflow: hidden;
+}
+
+.szm-gsap-horizontal-track {
+	display: flex;
+	flex-wrap: nowrap;
+	height: 100%;
+}
+
+.szm-gsap-horizontal-panel {
+	/* 100% (van de container) i.p.v. 100vw: 100vw kan op sommige mobiele
+	   browsers net iets breder zijn dan de werkelijke viewport (scrollbar-
+	   gutter/adresbalk-verschillen), wat een horizontale page-scrollbar gaf. */
+	flex: 0 0 100%;
+	min-width: 0;
+}
+
+/* Voordat gsap-effects.js klaar is: normale verticale stapeling i.p.v. clip. */
+.szm-gsap-horizontal:not(.szm-gsap-horizontal--ready) {
+	overflow: visible;
+}
+
+/* Full-viewport scroll slides (core/group). */
+.szm-gsap-fullpage {
+	position: relative;
+	overflow: hidden;
+	/* dvh volgt de zichtbare viewport op mobiel (adresbalk in/uit), vh niet;
+	   vh blijft de fallback voor browsers zonder dvh-support. */
+	height: 100vh;
+	height: 100dvh;
+}
+
+.szm-gsap-fullpage-panel {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+/* Voordat gsap-effects.js klaar is: normale verticale stapeling i.p.v. overlap. */
+.szm-gsap-fullpage:not(.szm-gsap-fullpage--ready) {
+	height: auto;
+	overflow: visible;
+}
+.szm-gsap-fullpage:not(.szm-gsap-fullpage--ready) .szm-gsap-fullpage-panel {
+	position: static;
+}
+
+/* Editor: altijd alle panelen onder elkaar tonen, nooit overlappend/verborgen. */
+.block-editor-block-list__block.szm-gsap-fullpage {
+	height: auto !important;
+	overflow: visible !important;
+}
+.block-editor-block-list__block .szm-gsap-fullpage-panel {
+	position: static !important;
+	opacity: 1 !important;
+}
+
+/* Infinite marquee (core/list). */
+.szm-gsap-marquee {
+	display: flex;
+	flex-wrap: nowrap;
+	list-style: none;
+	overflow: hidden;
+	padding-left: 0;
+	will-change: transform;
+}
+
+.szm-gsap-marquee > li {
+	flex: 0 0 auto;
+	white-space: nowrap;
+	margin-right: 2.5rem;
+}
+
+/* Editor: altijd de statische, ongedupliceerde staat tonen. */
+.block-editor-block-list__block.szm-gsap-marquee,
+.block-editor-block-list__block .szm-gsap-horizontal-track {
+	overflow: visible !important;
 	transform: none !important;
 }
