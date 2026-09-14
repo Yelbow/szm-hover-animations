@@ -81,9 +81,44 @@
 	transform: none;
 }
 
+/**
+ * Combinatie hover + entrance op hetzelfde blok.
+ * .szm-hover en .szm-entrance declareren allebei de volledige "transition"
+ * shorthand; zonder deze regel wint .szm-entrance die altijd (latere regel,
+ * gelijke specificiteit), waardoor hover's box-shadow/filter niet meer
+ * transitionen en transform de (te trage) entrance-speed + -delay krijgt
+ * i.p.v. de hover-speed. Oplossing: zolang het blok nog niet onthuld is,
+ * gebruikt transform/opacity de entrance-timing (voor de reveal-animatie);
+ * zodra frontend.js "szm-entrance-revealed" toevoegt, vallen alle vier
+ * eigenschappen terug op hover-timing, zodat hover na reveal net zo snel
+ * aanvoelt als op een hover-only blok.
+ */
+.szm-hover.szm-entrance {
+	transition-property: transform, box-shadow, opacity, filter;
+	transition-duration:
+		var(--szm-entrance-speed, 0.5s),
+		var(--szm-hover-speed, 0.25s),
+		var(--szm-entrance-speed, 0.5s),
+		var(--szm-hover-speed, 0.25s);
+	transition-timing-function: ease;
+	transition-delay:
+		var(--szm-entrance-delay, 0s), 0s,
+		var(--szm-entrance-delay, 0s), 0s;
+}
+
+.szm-hover.szm-entrance.szm-entrance-revealed {
+	transition-duration: var(--szm-hover-speed, 0.25s);
+	transition-delay: 0s;
+}
+
 /* Verminderde beweging: direct tonen, geen animatie/vertraging. */
 @media (prefers-reduced-motion: reduce) {
 	.szm-entrance {
+		transition-duration: 0s;
+		transition-delay: 0s;
+	}
+
+	.szm-hover.szm-entrance {
 		transition-duration: 0s;
 		transition-delay: 0s;
 	}

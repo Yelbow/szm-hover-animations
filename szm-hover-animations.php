@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SZM Hover Animations
  * Description: Voegt "Hover animatie" en "Entrance animatie" dropdowns toe aan de block-instellingen (site editor) van Group-, Cover-, Column- en Columns-blokken, inclusief snelheid en stagger-vertraging.
- * Version: 1.2.0
+ * Version: 1.2.1
  * Author: Studio Zonder Meer
  * Text Domain: szm-hover-animations
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SZM_HA_VERSION', '1.2.0' );
+define( 'SZM_HA_VERSION', '1.2.1' );
 define( 'SZM_HA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SZM_HA_URL', plugin_dir_url( __FILE__ ) );
 
