@@ -29,3 +29,7 @@ User's own words, verbatim, from the 2026-09-13/14 session. Not paraphrased or i
 ## 2026-09-14 (vervolg)
 
 > check studiozondermeer.nl on the homepage i made a different kind of gsap animations i want to have included in the plugin is wel. make sure there are no block recovery errors in wp admin. and also you are allowed to impeove my version as long as the design stays good.
+
+> check this pages backend: https://fse-test.studiozondermeer.nl/wp-admin/post.php?post=201 check it visually. ITS CUSTOM HTML thats not what i wanted i want only core blocks and work on it. i want to select the gsap animations in the site editors. (FOR ALL SPEC AND VERIFY PURPOSES IFT ITS CUSTOM HTML IN WP-ADMIN ITS WRONG, IF ITS BLOCK RECOVERY ITS NOT FINISHED.) SAVE THIS. FIX IT
+
+> check it yourself visually it definitly doesnt work
