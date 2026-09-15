@@ -20,7 +20,11 @@
 	}
 
 	function initHoverTouchAlternative() {
-		var elements = document.querySelectorAll( '.szm-hover' );
+		// .szm-hover-group heeft geen eigen hover-effect (dus geen ":hover"-CSS op
+		// zichzelf) maar moet op touch alsnog "szm-hover-touch-active" krijgen: dat
+		// is wat de ".szm-hover-group.szm-hover-touch-active .szm-hover-reveal"-regel
+		// in style.css matcht om kind-blokken te onthullen.
+		var elements = document.querySelectorAll( '.szm-hover, .szm-hover-group' );
 		if ( ! elements.length || ! ( 'ontouchstart' in window || navigator.maxTouchPoints > 0 ) ) {
 			return;
 		}

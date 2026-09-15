@@ -126,6 +126,10 @@
 		if ( isHoverSupported( name ) ) {
 			extra.szmHoverAnimation = { type: 'string', default: '' };
 			extra.szmHoverSpeed     = { type: 'number', default: DEFAULT_HOVER_SPEED };
+			// Hover-groep: dit blok telt als hover-trigger voor kind-blokken met het
+			// "Onthullen"-hover-effect (szmHoverAnimation === 'reveal'), onafhankelijk
+			// van of dit blok zelf een hover-animatie heeft.
+			extra.szmHoverGroup     = { type: 'boolean', default: false };
 		}
 
 		if ( isEntranceSupported( name ) ) {
@@ -311,6 +315,14 @@
 							min: 100,
 							max: 1000,
 							step: 50,
+						} ),
+						el( ToggleControl, {
+							label: __( 'Hover-groep', 'szm-hover-animations' ),
+							help: __( 'Dit blok telt als hover-trigger voor kind-blokken met het "Onthullen"-hover-effect (bv. een icoon of knop die pas verschijnt als je over deze hele kaart hovert, niet alleen over het icoon zelf).', 'szm-hover-animations' ),
+							checked: !! attributes.szmHoverGroup,
+							onChange: function ( value ) {
+								setAttributes( { szmHoverGroup: value } );
+							},
 						} )
 					),
 					showEntrance && el(
@@ -642,6 +654,10 @@
 			style[ '--szm-hover-speed' ] = ( attributes.szmHoverSpeed || DEFAULT_HOVER_SPEED ) + 'ms';
 		}
 
+		if ( isHoverSupported( blockType.name ) && attributes.szmHoverGroup ) {
+			classes.push( 'szm-hover-group' );
+		}
+
 		if ( isEntranceSupported( blockType.name ) && attributes.szmEntranceAnimation ) {
 			classes.push( 'szm-entrance', classForEntrance( attributes.szmEntranceAnimation ) );
 			style[ '--szm-entrance-speed' ] = ( attributes.szmEntranceSpeed || DEFAULT_ENTRANCE_SPEED ) + 'ms';
@@ -733,9 +749,10 @@
 			var name       = props.name;
 			var attributes = props.attributes;
 			var showHover    = isHoverSupported( name ) && !! attributes.szmHoverAnimation;
+			var showHoverGroup = isHoverSupported( name ) && !! attributes.szmHoverGroup;
 			var showEntrance = isEntranceSupported( name ) && !! attributes.szmEntranceAnimation;
 
-			if ( ! showHover && ! showEntrance ) {
+			if ( ! showHover && ! showHoverGroup && ! showEntrance ) {
 				return el( BlockListBlock, props );
 			}
 
@@ -745,6 +762,10 @@
 			if ( showHover ) {
 				classes.push( 'szm-hover', classForHover( attributes.szmHoverAnimation ) );
 				style[ '--szm-hover-speed' ] = ( attributes.szmHoverSpeed || DEFAULT_HOVER_SPEED ) + 'ms';
+			}
+
+			if ( showHoverGroup ) {
+				classes.push( 'szm-hover-group' );
 			}
 
 			if ( showEntrance ) {

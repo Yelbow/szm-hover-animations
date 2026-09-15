@@ -63,6 +63,53 @@
 	box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
 
+/*
+ * Verdonkeren: gefotografeerde/beeld-blokken krijgen een donkerder, contrastrijker
+ * aanzien bij hover — het "editorial overlay wordt donkerder" effect van
+ * productkaarten op modern-thong-edit.base44.app (daar een losse gradient-laag
+ * die van black/80 naar black/90 gaat; hier vereenvoudigd tot brightness/contrast
+ * zodat het op elk blok werkt, niet alleen blokken met een eigen overlay-laag).
+ */
+.szm-hover-darken:hover,
+.szm-hover-darken.szm-hover-touch-active {
+	filter: brightness(0.82) contrast(1.05);
+}
+
+/* Letters uit elkaar: subtiele letter-spacing toename, zoals de "Discover X →"-links
+ * op modern-thong-edit.base44.app (daar group-hover:gap-3 tussen tekst en pijl-icoon;
+ * hier als letter-spacing zodat het op tekst/knoppen werkt zonder een apart pijl-element). */
+.szm-hover-spread:hover,
+.szm-hover-spread.szm-hover-touch-active {
+	letter-spacing: 0.08em;
+}
+
+/*
+ * Onthullen: blok is standaard onzichtbaar en verschijnt pas als de dichtstbijzijnde
+ * voorouder met de class "szm-hover-group" gehoverd wordt (Hover-groep toggle in het
+ * "Hover animatie"-paneel) — zoals het wishlist-icoon en de "Add to cart"-balk die op
+ * modern-thong-edit.base44.app pas verschijnen zodra je over de hele productkaart
+ * hovert, niet alleen over het icoon/de balk zelf.
+ * Eigen :hover/touch blijft ook werken als los effect zonder hover-groep.
+ */
+.szm-hover-reveal {
+	opacity: 0;
+	transform: translateY(8px);
+}
+
+.szm-hover-reveal:hover,
+.szm-hover-reveal.szm-hover-touch-active,
+.szm-hover-group:hover .szm-hover-reveal,
+.szm-hover-group.szm-hover-touch-active .szm-hover-reveal {
+	opacity: 1;
+	transform: none;
+}
+
+/* Editor: reveal-kinderen altijd zichtbaar tijdens bewerken, anders lijkt het blok leeg. */
+.block-editor-block-list__block .szm-hover-reveal {
+	opacity: 1;
+	transform: none;
+}
+
 /* Editor: iframe/canvas kan overflow clippen, dit voorkomt afgekapte hover-effecten */
 .block-editor-block-list__block.szm-hover {
 	overflow: visible;
@@ -239,6 +286,15 @@
    is"-fallback nodig zoals bij slider/accordion/fullpage: er wordt niets
    verborgen of gestapeld voordat de JS draait, items staan gewoon normaal
    onder elkaar totdat ScrollTrigger ze begint te pinnen/inklappen. */
+.szm-gsap-process {
+	/* Terwijl dit blok gepind is (position: fixed door ScrollTrigger) schuift
+	   de rest van de pagina er onderdoor — zonder een dekkende achtergrond
+	   schijnt die content er "doorheen" (transparante dubbele belichting met
+	   wat er nog net onder wegscrollt). background-color valt terug op wit;
+	   overschrijf 'm zelf als de pagina een andere achtergrond gebruikt. */
+	background-color: var( --wp--preset--color--background, #fff );
+}
+
 .szm-gsap-process-content {
 	overflow: hidden;
 }
