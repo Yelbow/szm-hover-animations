@@ -75,12 +75,25 @@
 	filter: brightness(0.82) contrast(1.05);
 }
 
-/* Letters uit elkaar: subtiele letter-spacing toename, zoals de "Discover X →"-links
- * op modern-thong-edit.base44.app (daar group-hover:gap-3 tussen tekst en pijl-icoon;
- * hier als letter-spacing zodat het op tekst/knoppen werkt zonder een apart pijl-element). */
+/*
+ * Uit elkaar schuiven: vergroot de "gap" tussen de kind-elementen bij hover — dit
+ * is letterlijk het "Discover X →"-effect op modern-thong-edit.base44.app
+ * (group-hover:gap-3: de ruimte tussen tekst en pijl-icoon wordt groter, de tekst
+ * zelf verandert niet). Vereist een blok met "Flex"-layout en 2+ kinderen (bv. een
+ * Group op "Flex" met een tekst-kind en een los pijl/lijn-kind) — op een blok met
+ * maar één kind (alleen tekst) is er niets om uit elkaar te schuiven en doet dit
+ * effect zichtbaar niets, met opzet: geen letter-spacing-fallback, want dat is een
+ * ander effect dan wat op de bronsite gebeurt.
+ * Basis-"gap" blijft ongemoeid (de eigen Layout-instelling van het blok); alleen de
+ * hover-waarde wordt hier vastgezet, net als Tailwinds vaste gap-2 -> gap-3.
+ */
+.szm-hover-spread {
+	transition-property: transform, box-shadow, opacity, filter, gap;
+}
+
 .szm-hover-spread:hover,
 .szm-hover-spread.szm-hover-touch-active {
-	letter-spacing: 0.08em;
+	gap: 1.25em;
 }
 
 /*

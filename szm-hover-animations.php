@@ -30,7 +30,7 @@ function szm_ha_get_animations() {
 		'tilt'     => __( 'Kantelen', 'szm-hover-animations' ),
 		'shadow'   => __( 'Schaduw uitlichten', 'szm-hover-animations' ),
 		'darken'   => __( 'Verdonkeren (editorial overlay)', 'szm-hover-animations' ),
-		'spread'   => __( 'Letters uit elkaar (link-microinteractie)', 'szm-hover-animations' ),
+		'spread'   => __( 'Uit elkaar schuiven (gap tussen kinderen, bv. tekst + pijl)', 'szm-hover-animations' ),
 		'reveal'   => __( 'Onthullen (verborgen tot hover-groep gehoverd wordt)', 'szm-hover-animations' ),
 	);
 }
