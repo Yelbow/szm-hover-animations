@@ -295,3 +295,10 @@ als `frontend.js` niet laadt); Marquee+Entrance-combinatie niet live getest.
 - FOUC: `.szm-entrance-children:not(.szm-children-ready){opacity:0}` tot frontend.js de kinderen heeft voorzien.
 - GSAP bewust niet meegenomen (user akkoord): GSAP-effecten werken al op containerniveau.
 - Testpagina: fse-test post 684, /szm-kinderen-animatie/.
+
+## v1.13.0 — GSAP entrance-effecten volgen de 100vh-replayregel (2026-09-25)
+
+- **Wens:** de replayregel van Entrance (v1.11.1) geldt "uiteraard ook op GSAP entrance-achtige animaties".
+- **Welke:** tekst-reveal (chars/words/lines), counter, video "Inzoomen bij in beeld komen". Niet: scroll-gekoppelde effecten (parallax, scrub, pin, proces, horizontal, fullpage), play-on-scroll, marquee, magnetic, slider, accordion.
+- **Werking:** `entranceReplay(el, tween, {loop, onReset})` in `gsap-effects.js`: ScrollTrigger `onEnter`/`onEnterBack` speelt af, IntersectionObserver met `rootMargin: '100% 0px 100% 0px'` zet terug (`pause(0)`), een tweede IO pauzeert de "Na een tijdje herhalen"-loop buiten beeld. Vervangt `attachVisibilityLoop`. Weg: `once: true` (counter) en `toggleActions ... reverse` (video-reveal speelde terug bij omhoog scrollen).
+- **Geverifieerd:** Playwright wheel-scroll op `/szm-previews/` (tekst, counter) en `szm-gsap-demo-2` (video): binnen 100vh blijft staan, >100vh onder/boven zet terug, terugkomen van beide kanten speelt opnieuw af, 0 pageerrors.
