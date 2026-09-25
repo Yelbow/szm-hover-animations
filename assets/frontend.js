@@ -5,6 +5,10 @@
  * ook als de "szm_ha_load_gsap" filter uit staat):
  * - Entrance: voegt "szm-entrance-revealed" toe zodra een blok met de class
  *   "szm-entrance" in beeld scrollt, zodat de fade/slide-in CSS kan animeren.
+ *   Zodra het blok meer dan 100vh boven of onder de viewport uit gescrolld is
+ *   wordt "szm-entrance-revealed" weer verwijderd, zodat de animatie opnieuw
+ *   afspeelt als de gebruiker het blok nogmaals in beeld scrollt (i.p.v. maar
+ *   één keer per paginabezoek).
  * - Hover-op-touch: ":hover" bestaat niet op een touchscreen, dus tikken op
  *   een ".szm-hover"-blok deed op mobiel niets. Voegt op "touchstart" de
  *   class "szm-hover-touch-active" toe (die de ":hover"-CSS in style.css ook
@@ -68,15 +72,16 @@
 			return;
 		}
 
-		function reveal( entries, observer ) {
+		function reveal( entries ) {
 			entries.forEach( function ( entry ) {
 				if ( entry.isIntersecting ) {
 					entry.target.classList.add( 'szm-entrance-revealed' );
-					observer.unobserve( entry.target );
 				}
 			} );
 		}
 
+		// Niet meer unobserven na de eerste reveal: het blok moet opnieuw
+		// kunnen animeren als het weer in beeld komt (zie resetIfFar hieronder).
 		var observer = new IntersectionObserver( reveal, {
 			threshold: 0.15,
 			rootMargin: '0px 0px -10% 0px',
@@ -88,8 +93,25 @@
 			rootMargin: '0px 0px -50px 0px',
 		} );
 
+		// Reset: zodra een blok meer dan 100vh (100% van de viewporthoogte,
+		// boven én onder) buiten beeld gescrolld is, "szm-entrance-revealed"
+		// weer weghalen zodat de volgende keer intersecten weer een reveal
+		// triggert. rootMargin-percentages resolven tegen de viewporthoogte
+		// (root = null), dus "100%" hier is letterlijk 100vh.
+		var resetObserver = new IntersectionObserver( function ( entries ) {
+			entries.forEach( function ( entry ) {
+				if ( ! entry.isIntersecting ) {
+					entry.target.classList.remove( 'szm-entrance-revealed' );
+				}
+			} );
+		}, {
+			threshold: 0,
+			rootMargin: '100% 0px 100% 0px',
+		} );
+
 		Array.prototype.forEach.call( elements, function ( el ) {
 			( el.classList.contains( 'szm-entrance-reveal' ) ? revealObserver : observer ).observe( el );
+			resetObserver.observe( el );
 		} );
 	}
 
