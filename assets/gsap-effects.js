@@ -636,7 +636,7 @@
 			// zie primeVideo() hierboven.
 			primeVideo( video );
 			var speed = num( wrapper.getAttribute( 'data-szm-video-speed' ), 800 ) / 1000;
-			gsap.fromTo(
+			entranceReplay( wrapper, gsap.fromTo(
 				video,
 				{ autoAlpha: 0, scale: 1.08 },
 				{
@@ -644,13 +644,9 @@
 					scale: 1,
 					duration: speed,
 					ease: gsapEase( wrapper ),
-					scrollTrigger: {
-						trigger: wrapper,
-						start: 'top 85%',
-						toggleActions: 'play none none reverse',
-					},
+					paused: true,
 				}
-			);
+			) );
 		} );
 
 		document.querySelectorAll( '.szm-gsap-video-play-on-scroll' ).forEach( function ( wrapper ) {
@@ -748,28 +744,87 @@
 	}
 
 	/**
-	 * "Na een tijdje herhalen" (data-szm-loop, aan by default): een losse,
-	 * pauzeerbare timeline die pas ná de eerste (scroll-getriggerde) reveal
-	 * begint en alleen loopt zolang het blok daadwerkelijk in beeld is —
-	 * anders zou een blok ver buiten beeld onnodig door blijven animeren.
-	 * IntersectionObserver i.p.v. nog een ScrollTrigger: hoeft niet mee te
-	 * doen aan pin/scrub-berekeningen, alleen zichtbaarheid.
+	 * Entrance-achtige GSAP-effecten (tekst-reveal, counter, video-reveal)
+	 * volgen dezelfde regel als .szm-entrance in frontend.js (v1.11.1):
+	 * afspelen zodra het blok in beeld komt (van onder of van boven), en
+	 * terugzetten naar de beginstand zodra het meer dan 100vh buiten beeld is,
+	 * zodat het bij terugkomen opnieuw afspeelt.
+	 *
+	 * tween: gepauzeerde tween/timeline van de reveal zelf.
+	 * opts.loop: maakt de "Na een tijdje herhalen"-timeline (data-szm-loop),
+	 *   die pas na de eerste reveal begint en alleen loopt zolang het blok in
+	 *   beeld is — anders animeert een blok ver buiten beeld onnodig door.
+	 * opts.onReset: extra werk na terugzetten (bv. counter-tekst op 0 zetten).
 	 */
-	function attachVisibilityLoop( el, timeline ) {
+	function entranceReplay( el, tween, opts ) {
+		opts = opts || {};
+		var played  = false;
+		var visible = false;
+		var loopTl  = null;
+		var looping = false;
+
+		tween.eventCallback( 'onComplete', function () {
+			if ( ! opts.loop ) {
+				return;
+			}
+			loopTl = loopTl || opts.loop();
+			looping = true;
+			loopTl.restart( true ); // true = eerst de ingestelde wachttijd
+			if ( ! visible ) {
+				loopTl.pause();
+			}
+		} );
+
+		function play() {
+			if ( played ) {
+				return;
+			}
+			played = true;
+			tween.restart();
+		}
+
+		window.ScrollTrigger.create( {
+			trigger: el,
+			start: 'top 85%',
+			end: 'bottom 15%',
+			onEnter: play,
+			onEnterBack: play,
+		} );
+
 		if ( ! window.IntersectionObserver ) {
-			timeline.play();
 			return;
 		}
-		var observer = new window.IntersectionObserver( function ( entries ) {
+
+		new window.IntersectionObserver( function ( entries ) {
 			entries.forEach( function ( entry ) {
-				if ( entry.isIntersecting ) {
-					timeline.play();
-				} else {
-					timeline.pause();
+				visible = entry.isIntersecting;
+				if ( loopTl && looping ) {
+					if ( visible ) {
+						loopTl.resume();
+					} else {
+						loopTl.pause();
+					}
 				}
 			} );
-		}, { threshold: 0.1 } );
-		observer.observe( el );
+		}, { threshold: 0.1 } ).observe( el );
+
+		// "100%" in rootMargin = 100vh (percentages t.o.v. de viewport).
+		new window.IntersectionObserver( function ( entries ) {
+			entries.forEach( function ( entry ) {
+				if ( entry.isIntersecting || ! played ) {
+					return;
+				}
+				played  = false;
+				looping = false;
+				if ( loopTl ) {
+					loopTl.pause( 0 );
+				}
+				tween.pause( 0 );
+				if ( opts.onReset ) {
+					opts.onReset();
+				}
+			} );
+		}, { rootMargin: '100% 0px 100% 0px' } ).observe( el );
 	}
 
 	function initTextReveal() {
@@ -798,25 +853,19 @@
 			var units = split[ type ]; // split.chars / split.words / split.lines
 
 			gsap.set( units, { yPercent: 110, opacity: 0 } );
-			gsap.to( units, {
+			var reveal = gsap.to( units, {
 				yPercent: 0,
 				opacity: 1,
 				duration: speed,
 				stagger: stagger,
 				ease: ease,
-				scrollTrigger: {
-					trigger: el,
-					start: 'top 85%',
-					toggleActions: 'play none none none',
-				},
-				onComplete: function () {
-					if ( ! loop ) {
-						return;
-					}
-					var loopTl = gsap.timeline( { repeat: -1, delay: loopDelaySeconds( el ), repeatDelay: loopDelaySeconds( el ), paused: true } )
+				paused: true,
+			} );
+			entranceReplay( el, reveal, {
+				loop: loop && function () {
+					return gsap.timeline( { repeat: -1, delay: loopDelaySeconds( el ), repeatDelay: loopDelaySeconds( el ), paused: true } )
 						.to( units, { yPercent: 110, opacity: 0, duration: speed, stagger: stagger, ease: ease } )
 						.to( units, { yPercent: 0, opacity: 1, duration: speed, stagger: stagger, ease: ease } );
-					attachVisibilityLoop( el, loopTl );
 				},
 			} );
 		} );
@@ -858,27 +907,25 @@
 				el.textContent = before + formatted + after;
 			}
 
-			gsap.to( counter, {
+			var count = gsap.to( counter, {
 				value: target,
 				duration: speed,
 				ease: ease,
 				onUpdate: render,
-				scrollTrigger: {
-					trigger: el,
-					start: 'top 85%',
-					toggleActions: 'play none none none',
-					once: true,
-				},
-				onComplete: function () {
-					if ( ! loop ) {
-						return;
-					}
-					// "Animeer terug naar 0" i.p.v. instant resetten: dezelfde
-					// stijl als de eerste keer, alleen dan omgekeerd.
-					var loopTl = gsap.timeline( { repeat: -1, delay: loopDelaySeconds( el ), repeatDelay: loopDelaySeconds( el ), paused: true } )
+				paused: true,
+			} );
+			entranceReplay( el, count, {
+				// "Animeer terug naar 0" i.p.v. instant resetten: dezelfde
+				// stijl als de eerste keer, alleen dan omgekeerd.
+				loop: loop && function () {
+					return gsap.timeline( { repeat: -1, delay: loopDelaySeconds( el ), repeatDelay: loopDelaySeconds( el ), paused: true } )
 						.to( counter, { value: 0, duration: speed, ease: ease, onUpdate: render } )
 						.to( counter, { value: target, duration: speed, ease: ease, onUpdate: render } );
-					attachVisibilityLoop( el, loopTl );
+				},
+				// pause(0) slaat onUpdate over: tekst zelf op 0 zetten.
+				onReset: function () {
+					counter.value = 0;
+					render();
 				},
 			} );
 		} );
