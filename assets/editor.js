@@ -60,6 +60,18 @@
 
 	var DEFAULT_HOVER_SPEED    = 250; // ms
 	var DEFAULT_ENTRANCE_SPEED = 800; // ms
+	// Schuifafstand per entrance-variant (px) als het blok zelf niets instelt;
+	// moet gelijk blijven aan de var()-fallbacks in style.css. Varianten die
+	// hier niet staan (fade-in) schuiven niet en krijgen geen afstand-slider.
+	var ENTRANCE_DISTANCE_DEFAULTS = { 'slide-up': 32, reveal: 24 };
+	// "Fade-in reveal" (naar nixowebbuilding.nl) is korter dan de 800ms-standaard.
+	var REVEAL_ENTRANCE_SPEED  = 400; // ms
+	// Alleen blokken met kind-blokken hebben iets aan de stagger-slider.
+	var ENTRANCE_STAGGER_BLOCKS = [
+		'core/group', 'core/cover', 'core/column', 'core/columns', 'core/buttons',
+		'core/gallery', 'core/list', 'core/quote', 'core/media-text', 'core/details',
+		'core/social-links',
+	];
 	var DEFAULT_SLIDER_SPEED     = 500;  // ms, overgangssnelheid tussen slides
 	var DEFAULT_SLIDER_AUTOPLAY_SPEED = 4000; // ms
 	var DEFAULT_ACCORDION_SPEED  = 400;  // ms
@@ -196,6 +208,10 @@
 			// Niet rechtstreeks door de gebruiker ingesteld, zie withAnimationControls hieronder.
 			extra.szmEntranceDelay       = { type: 'number', default: 0 };
 			extra.szmEntranceEasing      = { type: 'string', default: DEFAULT_EASING };
+			// Geen default: zolang leeg geldt ENTRANCE_DISTANCE_DEFAULTS via de CSS-
+			// fallback en wordt er geen --szm-entrance-distance opgeslagen, zodat al
+			// gepubliceerde slide-up-blokken geldig blijven (geen block recovery).
+			extra.szmEntranceDistance    = { type: 'number' };
 		}
 
 		// Eén dropdown-attribute per blok-familie i.p.v. losse aan/uit-toggles
@@ -523,8 +539,24 @@
 							value: attributes.szmEntranceAnimation || '',
 							options: mapToOptions( ENTRANCE_OPTIONS_MAP ),
 							onChange: function ( value ) {
-								setAttributes( { szmEntranceAnimation: value } );
+								var next = { szmEntranceAnimation: value };
+								// Reveal is kort: neem de 400ms over zolang de snelheid
+								// nog op de standaard staat (eigen keuze blijft staan).
+								if ( value === 'reveal' && ( ! attributes.szmEntranceSpeed || attributes.szmEntranceSpeed === DEFAULT_ENTRANCE_SPEED ) ) {
+									next.szmEntranceSpeed = REVEAL_ENTRANCE_SPEED;
+								}
+								setAttributes( next );
 							},
+						} ),
+						ENTRANCE_DISTANCE_DEFAULTS.hasOwnProperty( attributes.szmEntranceAnimation ) && el( RangeControl, {
+							label: __( 'Schuifafstand (px)', 'szm-hover-animations' ),
+							value: typeof attributes.szmEntranceDistance === 'number' ? attributes.szmEntranceDistance : ENTRANCE_DISTANCE_DEFAULTS[ attributes.szmEntranceAnimation ],
+							onChange: function ( value ) {
+								setAttributes( { szmEntranceDistance: value } );
+							},
+							min: 0,
+							max: 80,
+							step: 2,
 						} ),
 						!! attributes.szmEntranceAnimation && el( RangeControl, {
 							label: __( 'Snelheid (ms)', 'szm-hover-animations' ),
@@ -544,7 +576,7 @@
 								setAttributes( { szmEntranceEasing: value } );
 							},
 						} ),
-						el( RangeControl, {
+						ENTRANCE_STAGGER_BLOCKS.indexOf( name ) !== -1 && el( RangeControl, {
 							label: __( 'Stagger: vertraging per kind-blok (ms)', 'szm-hover-animations' ),
 							help: __( 'Geldt voor de directe kind-blokken van dit blok (bv. kolommen in een Columns-blok), niet voor dit blok zelf.', 'szm-hover-animations' ),
 							value: attributes.szmEntranceStaggerStep || 0,
@@ -878,6 +910,9 @@
 			style[ '--szm-entrance-speed' ] = ( attributes.szmEntranceSpeed || DEFAULT_ENTRANCE_SPEED ) + 'ms';
 			style[ '--szm-entrance-delay' ] = ( attributes.szmEntranceDelay || 0 ) + 'ms';
 			style[ '--szm-entrance-ease' ]  = EASE_CSS_MAP[ attributes.szmEntranceEasing || DEFAULT_EASING ] || EASE_CSS_MAP[ DEFAULT_EASING ];
+			if ( typeof attributes.szmEntranceDistance === 'number' ) {
+				style[ '--szm-entrance-distance' ] = attributes.szmEntranceDistance + 'px';
+			}
 		}
 
 		// core/columns: slider XOR sticky proces-stappen, via het nieuwe
@@ -1033,6 +1068,9 @@
 				style[ '--szm-entrance-speed' ] = ( attributes.szmEntranceSpeed || DEFAULT_ENTRANCE_SPEED ) + 'ms';
 				style[ '--szm-entrance-delay' ] = ( attributes.szmEntranceDelay || 0 ) + 'ms';
 				style[ '--szm-entrance-ease' ]  = EASE_CSS_MAP[ attributes.szmEntranceEasing || DEFAULT_EASING ] || EASE_CSS_MAP[ DEFAULT_EASING ];
+				if ( typeof attributes.szmEntranceDistance === 'number' ) {
+					style[ '--szm-entrance-distance' ] = attributes.szmEntranceDistance + 'px';
+				}
 			}
 
 			var wrapperProps = Object.assign( {}, props.wrapperProps, {

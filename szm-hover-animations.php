@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SZM Hover Animations
  * Description: Eén "Hover animatie", "Entrance animatie" en "GSAP effect"-paneel per blok in de block-instellingen (site editor) — de GSAP-dropdown toont alleen de effecten die voor dat bloktype gelden en, na kiezen, alleen de bijpassende instellingen (slider/sticky proces-stappen op Columns, accordion/horizontal scroll/full-viewport slides/sticky proces-stappen op Group, video parallax/reveal/play-on-scroll/scrub op Video/Cover, tekst-reveal met SplitText op Heading/Paragraph, animated counter op Heading, magnetic button op Button, infinite marquee op List). Gepinde scroll-effecten corrigeren automatisch voor een sticky header/WP-adminbalk, mogen verticaal centreren i.p.v. vastpinnen tegen de bovenkant, en kunnen optioneel het blok erboven mee laten vastzetten. Tekst-reveal/counter herhalen zichzelf na een instelbare wachttijd zolang ze in beeld blijven. Alles mobiel-getest, allemaal gegraft op bestaande core-blokken — geen nieuwe blokken.
- * Version: 1.10.0
+ * Version: 1.11.0
  * Author: Studio Zonder Meer
  * Text Domain: szm-hover-animations
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SZM_HA_VERSION', '1.10.0' );
+define( 'SZM_HA_VERSION', '1.11.0' );
 define( 'SZM_HA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SZM_HA_URL', plugin_dir_url( __FILE__ ) );
 
@@ -44,6 +44,8 @@ function szm_ha_get_entrance_animations() {
 		''          => __( 'Geen', 'szm-hover-animations' ),
 		'fade-in'   => __( 'Fade in', 'szm-hover-animations' ),
 		'slide-up'  => __( 'Op laten schuiven', 'szm-hover-animations' ),
+		// Naar nixowebbuilding.nl (04A): korter, subtieler, eerder getriggerd.
+		'reveal'    => __( 'Fade-in reveal (kort en subtiel)', 'szm-hover-animations' ),
 	);
 }
 
@@ -191,7 +193,13 @@ function szm_ha_enqueue_editor_assets() {
 			// Welke blokken de hover-dropdown krijgen. Uitbreidbaar via de php-filter hieronder.
 			'blocks'          => apply_filters( 'szm_ha_supported_blocks', array( 'core/group', 'core/cover', 'core/column' ) ),
 			// Welke blokken de entrance-dropdown (+ snelheid/stagger) krijgen.
-			'entranceBlocks'  => apply_filters( 'szm_ha_supported_entrance_blocks', array( 'core/group', 'core/cover', 'core/column', 'core/columns' ) ),
+			'entranceBlocks'  => apply_filters( 'szm_ha_supported_entrance_blocks', array(
+				'core/group', 'core/cover', 'core/column', 'core/columns',
+				'core/heading', 'core/paragraph', 'core/list', 'core/quote', 'core/pullquote',
+				'core/image', 'core/gallery', 'core/video', 'core/embed', 'core/media-text',
+				'core/buttons', 'core/button', 'core/table', 'core/details', 'core/separator',
+				'core/social-links',
+			) ),
 			// GSAP-module: geen nieuwe blokken, gedrag toegevoegd aan bestaande blokken.
 			'gsapVideoOptions' => szm_ha_get_gsap_video_effects(),
 			// Welk blok slider-gedrag krijgt (kolommen worden slides).

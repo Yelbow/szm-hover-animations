@@ -144,7 +144,14 @@
 }
 
 .szm-entrance-slide-up {
-	transform: translateY(32px);
+	transform: translateY(var(--szm-entrance-distance, 32px));
+}
+
+/* Fade-in reveal (naar nixowebbuilding.nl): zelfde mechaniek als slide-up,
+   kortere afstand; de 400ms-snelheid zet de editor als attribute, de
+   vroegere trigger (10% / -50px) zit in frontend.js. */
+.szm-entrance-reveal {
+	transform: translateY(var(--szm-entrance-distance, 24px));
 }
 
 .szm-entrance-revealed {
@@ -182,6 +189,13 @@
 .szm-hover.szm-entrance.szm-entrance-revealed {
 	transition-duration: var(--szm-hover-speed, 0.25s);
 	transition-delay: 0s;
+}
+
+/* Marquee (GSAP) zet zelf een doorlopende transform op de lijst: entrance
+   mag daar alleen faden, anders ijlt de transform-transitie elke tick na. */
+.szm-gsap-marquee.szm-entrance {
+	transition-property: opacity;
+	transform: none;
 }
 
 /* Verminderde beweging: direct tonen, geen animatie/vertraging. */

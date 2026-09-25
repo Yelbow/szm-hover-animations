@@ -68,25 +68,28 @@
 			return;
 		}
 
-		var observer = new IntersectionObserver(
-			function ( entries ) {
-				entries.forEach( function ( entry ) {
-					if ( entry.isIntersecting ) {
-						entry.target.classList.add( 'szm-entrance-revealed' );
-						observer.unobserve( entry.target );
-					}
-				} );
-			},
-			{
-				threshold: 0.15,
-				rootMargin: '0px 0px -10% 0px',
-			}
-		);
+		function reveal( entries, observer ) {
+			entries.forEach( function ( entry ) {
+				if ( entry.isIntersecting ) {
+					entry.target.classList.add( 'szm-entrance-revealed' );
+					observer.unobserve( entry.target );
+				}
+			} );
+		}
 
-		elements.forEach ? elements.forEach( function ( el ) {
-			observer.observe( el );
-		} ) : Array.prototype.forEach.call( elements, function ( el ) {
-			observer.observe( el );
+		var observer = new IntersectionObserver( reveal, {
+			threshold: 0.15,
+			rootMargin: '0px 0px -10% 0px',
+		} );
+		// "Fade-in reveal" (naar nixowebbuilding.nl) triggert eerder: al bij 10%
+		// in beeld, 50px boven de onderrand.
+		var revealObserver = new IntersectionObserver( reveal, {
+			threshold: 0.1,
+			rootMargin: '0px 0px -50px 0px',
+		} );
+
+		Array.prototype.forEach.call( elements, function ( el ) {
+			( el.classList.contains( 'szm-entrance-reveal' ) ? revealObserver : observer ).observe( el );
 		} );
 	}
 
