@@ -284,3 +284,14 @@ als `frontend.js` niet laadt); Marquee+Entrance-combinatie niet live getest.
 - **Opname:** `~/.claude/skills/site-animatie-analyse/scripts/gif.js` (Chrome-screencast + ffmpeg, 320px, 96 kleuren). Gotcha's in de skill-`decisions.md`.
 - **Geverifieerd:** alle 28 GIF's via contactsheets bekeken (beginstand → beweging), Inspector-screenshots voor Entrance (Fade-in reveal) en GSAP (Slider), editor-check 680 + 201: 0 ongeldig, 0 recovery.
 - **Beperkt:** hover-spread en hover-tilt zijn in 320px subtiel; video-GIF's 230–370 KB (lazy geladen, alleen in de editor). Sub-presets (fullpage-overgang stack/slideup/zoom, horizontal stack) hebben geen eigen GIF.
+
+## 2026-09-25 — v1.13.0 "Toepassen op kind-blokken" (entrance + hover)
+
+- Container kiest "Toepassen op: Dit blok / Kind-blokken" (entrance: `ENTRANCE_STAGGER_BLOCKS`; hover: group/cover/column). Opgeslagen als `szm-entrance-children` + `data-szm-entrance-children="{variant}"` + `data-szm-stagger`; hover `szm-hover-children` + `data-szm-hover-children`. Default `self` = oude markup ongewijzigd (geen block recovery). Volgorde van style-keys in addSaveProps niet wijzigen.
+- Doelen worden op de front-end bepaald (`collectTargets` in frontend.js), niet als attribute in elk kind opgeslagen: verplaatsen/toevoegen van blokken en synced patterns blijven kloppen. Editor spiegelt dezelfde regels (`isPassThroughBlock`, `countChildTargets`, `findInheritingParent`) voor de "Animatie via ouder-blok"-melding en de teller.
+- Doorzichtig (item-containers, hun kinderen animeren los): columns, buttons, gallery, social-links, group met grid-layout of rij (flex horizontaal). **Stapel (flex verticaal) en gewone groep niet**: dat is meestal een kaart die als één geheel moet binnenkomen (Grid > Kaart-groep > inhoud).
+- Eigen entrance/hover op een kind wint; tekst-reveal telt als eigen entrance (anders dubbel). GSAP-containers zijn nooit doorzichtig maar animeren als één geheel.
+- Stagger = wachtrij per ouder (`setStaggerDelay`): elk kind dat onthuld wordt start ≥ stap ms na het vorige. Alles tegelijk in beeld → 0,1,2… × stap; lang grid → stagger loopt per binnenscrollende rij door. Gekozen boven "alles start als ouder in beeld komt" (dan animeren onderste rijen buiten beeld).
+- FOUC: `.szm-entrance-children:not(.szm-children-ready){opacity:0}` tot frontend.js de kinderen heeft voorzien.
+- GSAP bewust niet meegenomen (user akkoord): GSAP-effecten werken al op containerniveau.
+- Testpagina: fse-test post 684, /szm-kinderen-animatie/.
