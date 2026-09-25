@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: SZM Hover Animations
- * Description: Voegt "Hover animatie" en "Entrance animatie" dropdowns toe aan de block-instellingen (site editor), plus een volledige GSAP-module: slider (Columns), sticky process-stappen (Columns), accordion (Group), horizontal scroll (Group), full-viewport scroll slides (Group), video parallax/reveal/play-on-scroll/scrub (Video/Cover), tekst-reveal met SplitText (Heading/Paragraph), animated counters (Heading), magnetic button (Button) en infinite marquee (List). Alles mobiel-getest, allemaal gegraft op bestaande core-blokken — geen nieuwe blokken.
- * Version: 1.8.0
+ * Description: Eén "Hover animatie", "Entrance animatie" en "GSAP effect"-paneel per blok in de block-instellingen (site editor) — de GSAP-dropdown toont alleen de effecten die voor dat bloktype gelden en, na kiezen, alleen de bijpassende instellingen (slider/sticky proces-stappen op Columns, accordion/horizontal scroll/full-viewport slides/sticky proces-stappen op Group, video parallax/reveal/play-on-scroll/scrub op Video/Cover, tekst-reveal met SplitText op Heading/Paragraph, animated counter op Heading, magnetic button op Button, infinite marquee op List). Gepinde scroll-effecten corrigeren automatisch voor een sticky header/WP-adminbalk, mogen verticaal centreren i.p.v. vastpinnen tegen de bovenkant, en kunnen optioneel het blok erboven mee laten vastzetten. Tekst-reveal/counter herhalen zichzelf na een instelbare wachttijd zolang ze in beeld blijven. Alles mobiel-getest, allemaal gegraft op bestaande core-blokken — geen nieuwe blokken.
+ * Version: 1.10.0
  * Author: Studio Zonder Meer
  * Text Domain: szm-hover-animations
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SZM_HA_VERSION', '1.8.0' );
+define( 'SZM_HA_VERSION', '1.10.0' );
 define( 'SZM_HA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SZM_HA_URL', plugin_dir_url( __FILE__ ) );
 
@@ -76,6 +76,99 @@ function szm_ha_get_gsap_text_effects() {
 }
 
 /**
+ * Welke GSAP-effecten beschikbaar zijn voor een core/columns-blok. Eén
+ * dropdown i.p.v. losse aan/uit-toggles per effect — sluiten elkaar toch al
+ * uit (zie addSaveProps in editor.js).
+ */
+function szm_ha_get_gsap_columns_effects() {
+	return array(
+		''        => __( 'Geen', 'szm-hover-animations' ),
+		'slider'  => __( 'Slider', 'szm-hover-animations' ),
+		'process' => __( 'Sticky proces-stappen', 'szm-hover-animations' ),
+	);
+}
+
+/**
+ * Welke GSAP-effecten beschikbaar zijn voor een core/group-blok. Zelfde
+ * reden als hierboven: al mutually exclusive, dus één dropdown.
+ */
+function szm_ha_get_gsap_group_effects() {
+	return array(
+		''            => __( 'Geen', 'szm-hover-animations' ),
+		'accordion'   => __( 'Accordion', 'szm-hover-animations' ),
+		'horizontal'  => __( 'Horizontal scroll', 'szm-hover-animations' ),
+		'fullpage'    => __( 'Full-viewport scroll slides', 'szm-hover-animations' ),
+		'process'     => __( 'Sticky proces-stappen', 'szm-hover-animations' ),
+	);
+}
+
+/**
+ * Curated easing-presets — geen losse GSAP/CSS-easingstring-invoer (te
+ * technisch), maar een paar smaken die overal (CSS-transities én GSAP-tweens)
+ * naar een concrete curve vertalen. Zie EASE_CSS_MAP/EASE_GSAP_MAP in
+ * editor.js/gsap-effects.js voor de daadwerkelijke waarden per preset.
+ */
+function szm_ha_get_easing_presets() {
+	return array(
+		'smooth' => __( 'Vloeiend', 'szm-hover-animations' ),
+		'snappy' => __( 'Strak', 'szm-hover-animations' ),
+		'bouncy' => __( 'Elastisch', 'szm-hover-animations' ),
+		'linear' => __( 'Lineair (constante snelheid)', 'szm-hover-animations' ),
+	);
+}
+
+/**
+ * Wanneer een gepind scroll-effect (sticky proces-stappen, horizontal scroll,
+ * video-scrub) begint met pinnen, relatief tot het blok. Los van deze keuze
+ * corrigeert gsap-effects.js altijd automatisch voor een sticky header/
+ * WP-adminbalk bovenaan de pagina (zie getFixedHeaderOffset()) — dat is geen
+ * gebruikersinstelling, dat hoort altijd te kloppen.
+ */
+function szm_ha_get_pin_start_presets() {
+	return array(
+		'top'    => __( 'Direct bovenaan beeld', 'szm-hover-animations' ),
+		'half'   => __( 'Op een kwart van het scherm', 'szm-hover-animations' ),
+		'center' => __( 'Gecentreerd in beeld', 'szm-hover-animations' ),
+	);
+}
+
+/**
+ * Wachttijd voordat tekst-reveal/counter zichzelf herhaalt (verdwijnen +
+ * opnieuw afspelen), zolang het blok in beeld blijft. Preset i.p.v. een
+ * los seconden-veld, zelfde UX-patroon als easing/pin-start hierboven.
+ */
+function szm_ha_get_loop_delay_presets() {
+	return array(
+		'short'  => __( 'Kort (~15 sec)', 'szm-hover-animations' ),
+		'normal' => __( 'Normaal (~30 sec)', 'szm-hover-animations' ),
+		'long'   => __( 'Lang (~60 sec)', 'szm-hover-animations' ),
+	);
+}
+
+/**
+ * Overgangsstijl tussen panelen bij Full-viewport scroll slides.
+ */
+function szm_ha_get_fullpage_transition_presets() {
+	return array(
+		'fade'    => __( 'Uitfaden', 'szm-hover-animations' ),
+		'stack'   => __( 'Stapelen', 'szm-hover-animations' ),
+		'slideup' => __( 'Omhoog schuiven', 'szm-hover-animations' ),
+		'zoom'    => __( 'Uitzoomen', 'szm-hover-animations' ),
+	);
+}
+
+/**
+ * Weergave-modus voor Horizontal scroll: klassiek zijwaarts meescrollen, of
+ * panelen die als kaarten op elkaar stapelen (geen horizontale beweging).
+ */
+function szm_ha_get_horizontal_mode_presets() {
+	return array(
+		'scroll' => __( 'Zijwaarts scrollen', 'szm-hover-animations' ),
+		'stack'  => __( 'Stapelen', 'szm-hover-animations' ),
+	);
+}
+
+/**
  * Editor-script: voegt attributes, inspector-dropdowns en editor-preview classes toe.
  */
 function szm_ha_enqueue_editor_assets() {
@@ -131,6 +224,15 @@ function szm_ha_enqueue_editor_assets() {
 			'gsapFullpageBlocks' => apply_filters( 'szm_ha_gsap_fullpage_blocks', array( 'core/group' ) ),
 			// Infinite marquee: List-items schuiven eindeloos door.
 			'gsapMarqueeBlocks' => apply_filters( 'szm_ha_gsap_marquee_blocks', array( 'core/list' ) ),
+			// Eén-dropdown GSAP-effect-keuze per blok-familie (i.p.v. losse
+			// aan/uit-toggles per effect, zie SPEC "1 box in de site editor").
+			'gsapColumnsOptions' => szm_ha_get_gsap_columns_effects(),
+			'gsapGroupOptions'   => szm_ha_get_gsap_group_effects(),
+			'easingOptions'      => szm_ha_get_easing_presets(),
+			'pinStartOptions'    => szm_ha_get_pin_start_presets(),
+			'loopDelayOptions'   => szm_ha_get_loop_delay_presets(),
+			'fullpageTransitionOptions' => szm_ha_get_fullpage_transition_presets(),
+			'horizontalModeOptions'     => szm_ha_get_horizontal_mode_presets(),
 		)
 	);
 

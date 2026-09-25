@@ -33,3 +33,23 @@ User's own words, verbatim, from the 2026-09-13/14 session. Not paraphrased or i
 > check this pages backend: https://fse-test.studiozondermeer.nl/wp-admin/post.php?post=201 check it visually. ITS CUSTOM HTML thats not what i wanted i want only core blocks and work on it. i want to select the gsap animations in the site editors. (FOR ALL SPEC AND VERIFY PURPOSES IFT ITS CUSTOM HTML IN WP-ADMIN ITS WRONG, IF ITS BLOCK RECOVERY ITS NOT FINISHED.) SAVE THIS. FIX IT
 
 > check it yourself visually it definitly doesnt work
+
+## 2026-09-15
+
+> via the plugin this page: https://fse-test.studiozondermeer.nl/wp-admin/post.php?post=201 has a lot of cool working animations but. 1 screens lock at top 0 which is very unintuitive. 2 all relevant settings need to be able to be changed by the user and 3. i only want 1 box in the siteeditor for animations. with a dropdown where you can select the availbe animations (for that core/block type) and selecting the animation shows the correct settings you are allowed to change. capiche? /grilling
+
+> q1 one for each hover, entrance, gsap, thats the max. so each gets one. so yeah agree with wha tyou said. q2 agree q3 agree q4 agree
+
+> q1 agree, q2 agree
+
+> it feels like you are missing some tho. q1 fine for now might change late (take a note) q2 def agree
+
+> q1 agree q2 agree
+
+> start building
+
+> write our decisions and spec of me wishes for future verification and checks
+
+## 2026-09-15 (vervolg) — feedback on szm-gsap-demo-2
+
+> some feedback. on this page: https://fse-test.studiozondermeer.nl/szm-gsap-demo-2/ 1.after some time (like quite some time) animations like those of 1 and 2 need to gradually in the same style of animation dissapear and reapear again. 3. magnatic button doesnt show up right now? 4. slider: each slide is a bit firther to the right. shouldnt be 6. i also want the option to have the text above this scrolling pannel to stay locked with it if you get what i mean. and i want the abilty to have the section truly vertical centered. 7. full-viewport scroll i want the option to have stack on eachother and 2 other options besides the fade. same goes for the horizontal scroll i would also like the ability to choose the stack version, 8. Sticky process should also work if its not a split collumn and. i want to have control over the animation speed/scrol length. 9. the infinite marque is not infinit it shoudl repeat it selve out of screen to be truly infinite and naturally repeat itself without breaks.

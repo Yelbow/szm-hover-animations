@@ -35,6 +35,29 @@
 	var GSAP_FULLPAGE_BLOCKS  = settings.gsapFullpageBlocks || [];
 	var GSAP_MARQUEE_BLOCKS   = settings.gsapMarqueeBlocks || [];
 
+	// Eén-dropdown GSAP-effect-keuze per blok-familie: core/columns kiest
+	// tussen slider/proces-stappen, core/group tussen accordion/horizontal/
+	// fullpage — voorheen losse aan/uit-toggles die tegelijk zichtbaar waren
+	// ondanks dat ze elkaar al uitsloten. Video/tekst-reveal hadden al maar
+	// één dropdown (geen tweede effect op hetzelfde bloktype) en blijven op
+	// hun eigen attribute (szmGsapVideoEffect/szmGsapText) staan.
+	var GSAP_COLUMNS_OPTIONS_MAP = settings.gsapColumnsOptions || {};
+	var GSAP_GROUP_OPTIONS_MAP   = settings.gsapGroupOptions || {};
+	var EASING_OPTIONS_MAP       = settings.easingOptions || {};
+	var PIN_START_OPTIONS_MAP    = settings.pinStartOptions || {};
+	var LOOP_DELAY_OPTIONS_MAP   = settings.loopDelayOptions || {};
+	var FULLPAGE_TRANSITION_OPTIONS_MAP = settings.fullpageTransitionOptions || {};
+	var HORIZONTAL_MODE_OPTIONS_MAP     = settings.horizontalModeOptions || {};
+
+	// Curated easing-presets → concrete CSS-timing-function. GSAP-kant van
+	// dezelfde presets staat in assets/gsap-effects.js (EASE_GSAP_MAP).
+	var EASE_CSS_MAP = {
+		smooth: 'ease',
+		snappy: 'cubic-bezier(0.22, 1, 0.36, 1)',
+		bouncy: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+		linear: 'linear',
+	};
+
 	var DEFAULT_HOVER_SPEED    = 250; // ms
 	var DEFAULT_ENTRANCE_SPEED = 800; // ms
 	var DEFAULT_SLIDER_SPEED     = 500;  // ms, overgangssnelheid tussen slides
@@ -46,6 +69,10 @@
 	var DEFAULT_COUNTER_SPEED    = 1500; // ms om naar het eindgetal te tellen
 	var DEFAULT_MAGNETIC_STRENGTH = 40;  // px, hoever de knop de cursor volgt
 	var DEFAULT_MARQUEE_SPEED    = 30;   // seconden voor 1 volledige loop
+	var DEFAULT_EASING           = 'smooth';
+	var DEFAULT_PIN_START        = 'top';
+	var DEFAULT_LOOP_DELAY       = 'normal';
+	var DEFAULT_PROCESS_SCROLL_LENGTH = 100; // % van schermhoogte per stap
 
 	function isHoverSupported( name ) {
 		return HOVER_BLOCKS.indexOf( name ) !== -1;
@@ -55,16 +82,14 @@
 		return ENTRANCE_BLOCKS.indexOf( name ) !== -1;
 	}
 
-	function isSliderSupported( name ) {
-		return GSAP_SLIDER_BLOCKS.indexOf( name ) !== -1;
+	function isColumnsFamily( name ) {
+		return GSAP_SLIDER_BLOCKS.indexOf( name ) !== -1 || GSAP_PROCESS_BLOCKS.indexOf( name ) !== -1;
 	}
 
-	function isGsapProcessSupported( name ) {
-		return GSAP_PROCESS_BLOCKS.indexOf( name ) !== -1;
-	}
-
-	function isAccordionSupported( name ) {
-		return GSAP_ACCORDION_BLOCKS.indexOf( name ) !== -1;
+	function isGroupFamily( name ) {
+		return GSAP_ACCORDION_BLOCKS.indexOf( name ) !== -1 ||
+			GSAP_HORIZONTAL_BLOCKS.indexOf( name ) !== -1 ||
+			GSAP_FULLPAGE_BLOCKS.indexOf( name ) !== -1;
 	}
 
 	function isGsapVideoSupported( name ) {
@@ -81,14 +106,6 @@
 
 	function isGsapMagneticSupported( name ) {
 		return GSAP_MAGNETIC_BLOCKS.indexOf( name ) !== -1;
-	}
-
-	function isGsapHorizontalSupported( name ) {
-		return GSAP_HORIZONTAL_BLOCKS.indexOf( name ) !== -1;
-	}
-
-	function isGsapFullpageSupported( name ) {
-		return GSAP_FULLPAGE_BLOCKS.indexOf( name ) !== -1;
 	}
 
 	function isGsapMarqueeSupported( name ) {
@@ -118,10 +135,46 @@
 	}
 
 	/**
+	 * Legacy-fallback: welk effect stond aan vóór de dropdown-samenvoeging
+	 * (v1.9.0), gelezen uit de oude losse boolean-attributes. Zo blijven al
+	 * gepubliceerde blokken (bv. fse-test post 201, studiozondermeer.nl)
+	 * precies hetzelfde ogen zonder dat iemand ze handmatig hoeft te
+	 * her-selecteren — dezelfde win-prioriteit die addSaveProps al gebruikte.
+	 */
+	function legacyColumnsEffect( attributes ) {
+		if ( attributes.szmGsapSlider ) {
+			return 'slider';
+		}
+		if ( attributes.szmGsapProcess ) {
+			return 'process';
+		}
+		return '';
+	}
+
+	function legacyGroupEffect( attributes ) {
+		if ( attributes.szmGsapAccordion ) {
+			return 'accordion';
+		}
+		if ( attributes.szmGsapHorizontal ) {
+			return 'horizontal';
+		}
+		if ( attributes.szmGsapFullpage ) {
+			return 'fullpage';
+		}
+		return '';
+	}
+
+	/**
 	 * 1. Attributes registreren op de ondersteunde blokken.
 	 */
 	function addAnimationAttributes( blockSettings, name ) {
 		var extra = {};
+
+		var columnsFamily  = isColumnsFamily( name );
+		var groupFamily     = isGroupFamily( name );
+		var videoFamily     = isGsapVideoSupported( name );
+		var textFamily      = isGsapTextSupported( name );
+		var magneticFamily  = isGsapMagneticSupported( name );
 
 		if ( isHoverSupported( name ) ) {
 			extra.szmHoverAnimation = { type: 'string', default: '' };
@@ -130,6 +183,7 @@
 			// "Onthullen"-hover-effect (szmHoverAnimation === 'reveal'), onafhankelijk
 			// van of dit blok zelf een hover-animatie heeft.
 			extra.szmHoverGroup     = { type: 'boolean', default: false };
+			extra.szmHoverEasing    = { type: 'string', default: DEFAULT_EASING };
 		}
 
 		if ( isEntranceSupported( name ) ) {
@@ -141,9 +195,44 @@
 			// Automatisch berekende vertraging voor dit blok (index-onder-siblings x parent-staggerStep).
 			// Niet rechtstreeks door de gebruiker ingesteld, zie withAnimationControls hieronder.
 			extra.szmEntranceDelay       = { type: 'number', default: 0 };
+			extra.szmEntranceEasing      = { type: 'string', default: DEFAULT_EASING };
 		}
 
-		if ( isSliderSupported( name ) ) {
+		// Eén dropdown-attribute per blok-familie i.p.v. losse aan/uit-toggles
+		// per effect. De oude attributes hieronder blijven geregistreerd zodat
+		// al opgeslagen content (met alleen de oude attributes) precies blijft
+		// werken via de legacy-fallback in withAnimationControls/addSaveProps.
+		if ( columnsFamily || groupFamily ) {
+			extra.szmGsapEffect = { type: 'string', default: '' };
+			// Sticky proces-stappen: scroll-afstand per stap (nu ook relevant voor
+			// Group, niet alleen Columns, sinds process ook daar kan).
+			extra.szmGsapProcessScrollLength = { type: 'number', default: DEFAULT_PROCESS_SCROLL_LENGTH };
+		}
+		if ( columnsFamily || groupFamily || videoFamily ) {
+			// Wanneer een gepind scroll-effect begint met pinnen (los van de
+			// automatische sticky-header-correctie in gsap-effects.js).
+			extra.szmGsapPinStart = { type: 'string', default: DEFAULT_PIN_START };
+			// Beide hieronder gelden voor alle gepinde effecten (proces-stappen,
+			// horizontal scroll, fullpage, video-scrub) — per-blok toggle, geen
+			// aparte instelling op een ouder-element (zie DECISIONS.md).
+			extra.szmGsapLockHeading    = { type: 'boolean', default: false };
+			extra.szmGsapVerticalCenter = { type: 'boolean', default: false };
+		}
+		if ( columnsFamily || groupFamily || videoFamily || textFamily || magneticFamily ) {
+			extra.szmGsapEasing = { type: 'string', default: DEFAULT_EASING };
+		}
+		if ( groupFamily ) {
+			extra.szmGsapFullpageTransition = { type: 'string', default: 'fade' };
+			extra.szmGsapHorizontalMode     = { type: 'string', default: 'scroll' };
+		}
+		if ( textFamily || isGsapCounterSupported( name ) ) {
+			// Herhalen na een tijdje: aan by default (zie DECISIONS.md — user
+			// wilde dit niet als opt-in maar als standaardgedrag).
+			extra.szmGsapLoop      = { type: 'boolean', default: true };
+			extra.szmGsapLoopDelay = { type: 'string', default: DEFAULT_LOOP_DELAY };
+		}
+
+		if ( GSAP_SLIDER_BLOCKS.indexOf( name ) !== -1 ) {
 			extra.szmGsapSlider             = { type: 'boolean', default: false };
 			extra.szmGsapSliderAutoplay     = { type: 'boolean', default: false };
 			extra.szmGsapSliderAutoplaySpeed = { type: 'number', default: DEFAULT_SLIDER_AUTOPLAY_SPEED };
@@ -151,13 +240,11 @@
 			extra.szmGsapSliderSpeed        = { type: 'number', default: DEFAULT_SLIDER_SPEED };
 		}
 
-		if ( isGsapProcessSupported( name ) ) {
-			// Sluit elkaar uit met szmGsapSlider op hetzelfde blok (core/columns);
-			// als beide aan staan wint de slider, zie addSaveProps.
+		if ( GSAP_PROCESS_BLOCKS.indexOf( name ) !== -1 ) {
 			extra.szmGsapProcess = { type: 'boolean', default: false };
 		}
 
-		if ( isAccordionSupported( name ) ) {
+		if ( GSAP_ACCORDION_BLOCKS.indexOf( name ) !== -1 ) {
 			extra.szmGsapAccordion            = { type: 'boolean', default: false };
 			extra.szmGsapAccordionSpeed       = { type: 'number', default: DEFAULT_ACCORDION_SPEED };
 			extra.szmGsapAccordionMultiple    = { type: 'boolean', default: false };
@@ -165,12 +252,12 @@
 			extra.szmGsapAccordionDefaultOpen = { type: 'number', default: -1 };
 		}
 
-		if ( isGsapVideoSupported( name ) ) {
+		if ( videoFamily ) {
 			extra.szmGsapVideoEffect = { type: 'string', default: '' };
 			extra.szmGsapVideoSpeed  = { type: 'number', default: DEFAULT_VIDEO_SPEED };
 		}
 
-		if ( isGsapTextSupported( name ) ) {
+		if ( textFamily ) {
 			extra.szmGsapText        = { type: 'string', default: '' };
 			extra.szmGsapTextSpeed   = { type: 'number', default: DEFAULT_TEXT_SPEED };
 			extra.szmGsapTextStagger = { type: 'number', default: DEFAULT_TEXT_STAGGER };
@@ -181,20 +268,16 @@
 			extra.szmGsapCounterSpeed = { type: 'number', default: DEFAULT_COUNTER_SPEED };
 		}
 
-		if ( isGsapMagneticSupported( name ) ) {
+		if ( magneticFamily ) {
 			extra.szmGsapMagnetic         = { type: 'boolean', default: false };
 			extra.szmGsapMagneticStrength = { type: 'number', default: DEFAULT_MAGNETIC_STRENGTH };
 		}
 
-		if ( isGsapHorizontalSupported( name ) ) {
-			// Sluit elkaar uit met szmGsapAccordion op hetzelfde blok (core/group);
-			// als beide aan staan wint de accordion, zie withAnimationControls.
+		if ( GSAP_HORIZONTAL_BLOCKS.indexOf( name ) !== -1 ) {
 			extra.szmGsapHorizontal = { type: 'boolean', default: false };
 		}
 
-		if ( isGsapFullpageSupported( name ) ) {
-			// Sluit elkaar uit met szmGsapAccordion en szmGsapHorizontal op hetzelfde
-			// blok; prioriteit accordion > horizontal > fullpage, zie addSaveProps.
+		if ( GSAP_FULLPAGE_BLOCKS.indexOf( name ) !== -1 ) {
 			extra.szmGsapFullpage = { type: 'boolean', default: false };
 		}
 
@@ -222,6 +305,11 @@
 	 * 2. Dropdowns + sliders toevoegen aan het instellingenpaneel (Inspector),
 	 * en de stagger-vertraging van dit blok automatisch bijhouden op basis van
 	 * zijn positie tussen zijn siblings en de staggerStep van de parent.
+	 *
+	 * Maximaal 3 panelen per blok: "Hover animatie", "Entrance animatie" en
+	 * "GSAP effect" — die derde is één dropdown die alleen de effecten toont
+	 * die voor dit bloktype gelden, en na kiezen alleen de bijpassende
+	 * instellingen (voorheen tot 6 losse GSAP-panelen tegelijk zichtbaar).
 	 */
 	var withAnimationControls = createHigherOrderComponent( function ( BlockEdit ) {
 		return function ( props ) {
@@ -231,16 +319,15 @@
 			var setAttributes  = props.setAttributes;
 			var showHover      = isHoverSupported( name );
 			var showEntrance   = isEntranceSupported( name );
-			var showSlider     = isSliderSupported( name );
-			var showGsapProcess = isGsapProcessSupported( name );
-			var showAccordion  = isAccordionSupported( name );
+			var showColumnsFamily = isColumnsFamily( name );
+			var showGroupFamily    = isGroupFamily( name );
 			var showGsapVideo  = isGsapVideoSupported( name );
 			var showGsapText   = isGsapTextSupported( name );
 			var showGsapCounter = isGsapCounterSupported( name );
 			var showGsapMagnetic = isGsapMagneticSupported( name );
-			var showGsapHorizontal = isGsapHorizontalSupported( name );
-			var showGsapFullpage = isGsapFullpageSupported( name );
 			var showGsapMarquee = isGsapMarqueeSupported( name );
+			var showGsapBox = showColumnsFamily || showGroupFamily || showGsapVideo || showGsapText ||
+				showGsapCounter || showGsapMagnetic || showGsapMarquee;
 
 			// Bereken automatisch hoeveel vertraging dit blok moet krijgen: zijn
 			// index tussen de directe siblings van dezelfde parent, vermenigvuldigd
@@ -282,10 +369,105 @@
 				// eslint-disable-next-line
 			}, [ computedDelay, showEntrance ] );
 
-			if ( ! showHover && ! showEntrance && ! showSlider && ! showGsapProcess && ! showAccordion && ! showGsapVideo &&
-				! showGsapText && ! showGsapCounter && ! showGsapMagnetic && ! showGsapHorizontal &&
-				! showGsapFullpage && ! showGsapMarquee ) {
+			if ( ! showHover && ! showEntrance && ! showGsapBox ) {
 				return el( BlockEdit, props );
+			}
+
+			// Welk effect toont de GSAP-dropdown als geselecteerd: het nieuwe
+			// szmGsapEffect-attribute als dat al is aangeraakt, anders afgeleid
+			// uit de oude losse toggles (zie legacyColumnsEffect/legacyGroupEffect).
+			var columnsEffect = showColumnsFamily ? ( attributes.szmGsapEffect || legacyColumnsEffect( attributes ) ) : '';
+			var groupEffect    = showGroupFamily ? ( attributes.szmGsapEffect || legacyGroupEffect( attributes ) ) : '';
+
+			function handleColumnsEffectChange( value ) {
+				// Zet de oude toggles altijd expliciet uit zodra de nieuwe dropdown
+				// wordt aangeraakt (ook bij "Geen") — anders zou een latere lezing
+				// via de legacy-fallback een net uitgezet effect weer "aanzetten".
+				setAttributes( {
+					szmGsapEffect: value,
+					szmGsapSlider: false,
+					szmGsapProcess: false,
+				} );
+			}
+
+			function handleGroupEffectChange( value ) {
+				setAttributes( {
+					szmGsapEffect: value,
+					szmGsapAccordion: false,
+					szmGsapHorizontal: false,
+					szmGsapFullpage: false,
+				} );
+			}
+
+			var gsapEasing   = attributes.szmGsapEasing || DEFAULT_EASING;
+			var gsapPinStart = attributes.szmGsapPinStart || DEFAULT_PIN_START;
+
+			function easingControl() {
+				return el( SelectControl, {
+					label: __( 'Easing', 'szm-hover-animations' ),
+					value: gsapEasing,
+					options: mapToOptions( EASING_OPTIONS_MAP ),
+					onChange: function ( value ) {
+						setAttributes( { szmGsapEasing: value } );
+					},
+				} );
+			}
+
+			function pinStartControl() {
+				return el( SelectControl, {
+					label: __( 'Wanneer begint het vastpinnen', 'szm-hover-animations' ),
+					help: __( 'Corrigeert automatisch voor een sticky header/adminbalk bovenaan — deze keuze is puur voor hoever in beeld het blok mag staan voordat het pint.', 'szm-hover-animations' ),
+					value: gsapPinStart,
+					options: mapToOptions( PIN_START_OPTIONS_MAP ),
+					onChange: function ( value ) {
+						setAttributes( { szmGsapPinStart: value } );
+					},
+				} );
+			}
+
+			// Herbruikbaar voor elk gepind effect (proces-stappen, horizontal
+			// scroll, fullpage, video-scrub): per-blok toggle i.p.v. een
+			// instelling op een ouder-element, zie DECISIONS.md q6.
+			function lockHeadingControl() {
+				return el( ToggleControl, {
+					label: __( 'Blok erboven mee laten vastzetten', 'szm-hover-animations' ),
+					help: __( 'Het blok direct vóór dit blok (bv. een titel) blijft zichtbaar/vast staan zolang dit blok gepind is.', 'szm-hover-animations' ),
+					checked: !! attributes.szmGsapLockHeading,
+					onChange: function ( value ) {
+						setAttributes( { szmGsapLockHeading: value } );
+					},
+				} );
+			}
+
+			function verticalCenterControl() {
+				return el( ToggleControl, {
+					label: __( 'Sectie verticaal centreren tijdens pin', 'szm-hover-animations' ),
+					checked: !! attributes.szmGsapVerticalCenter,
+					onChange: function ( value ) {
+						setAttributes( { szmGsapVerticalCenter: value } );
+					},
+				} );
+			}
+
+			// Niet voor fullpage: die panelen vullen altijd het hele scherm (vaste
+			// exemptie op de pin-start-keuze, zie DECISIONS.md), dus "verticaal
+			// centreren" zou daar niets zichtbaars veranderen.
+			function lockAndCenterControls() {
+				return el( Fragment, null, lockHeadingControl(), verticalCenterControl() );
+			}
+
+			function processScrollLengthControl() {
+				return el( RangeControl, {
+					label: __( 'Scroll-afstand per stap (% van schermhoogte)', 'szm-hover-animations' ),
+					help: __( 'Hoger = langzamer/meer scrollen nodig per stap.', 'szm-hover-animations' ),
+					value: attributes.szmGsapProcessScrollLength || DEFAULT_PROCESS_SCROLL_LENGTH,
+					onChange: function ( value ) {
+						setAttributes( { szmGsapProcessScrollLength: value } );
+					},
+					min: 50,
+					max: 200,
+					step: 10,
+				} );
 			}
 
 			return el(
@@ -315,6 +497,14 @@
 							min: 100,
 							max: 1000,
 							step: 50,
+						} ),
+						!! attributes.szmHoverAnimation && el( SelectControl, {
+							label: __( 'Easing', 'szm-hover-animations' ),
+							value: attributes.szmHoverEasing || DEFAULT_EASING,
+							options: mapToOptions( EASING_OPTIONS_MAP ),
+							onChange: function ( value ) {
+								setAttributes( { szmHoverEasing: value } );
+							},
 						} ),
 						el( ToggleControl, {
 							label: __( 'Hover-groep', 'szm-hover-animations' ),
@@ -346,6 +536,14 @@
 							max: 2000,
 							step: 50,
 						} ),
+						!! attributes.szmEntranceAnimation && el( SelectControl, {
+							label: __( 'Easing', 'szm-hover-animations' ),
+							value: attributes.szmEntranceEasing || DEFAULT_EASING,
+							options: mapToOptions( EASING_OPTIONS_MAP ),
+							onChange: function ( value ) {
+								setAttributes( { szmEntranceEasing: value } );
+							},
+						} ),
 						el( RangeControl, {
 							label: __( 'Stagger: vertraging per kind-blok (ms)', 'szm-hover-animations' ),
 							help: __( 'Geldt voor de directe kind-blokken van dit blok (bv. kolommen in een Columns-blok), niet voor dit blok zelf.', 'szm-hover-animations' ),
@@ -358,18 +556,18 @@
 							step: 25,
 						} )
 					),
-					showSlider && el(
+					showGsapBox && el(
 						PanelBody,
-						{ title: __( 'GSAP: Slider', 'szm-hover-animations' ), initialOpen: false },
-						el( ToggleControl, {
-							label: __( 'Kolommen als slider tonen', 'szm-hover-animations' ),
-							help: __( 'Elke kolom wordt een slide; front-end krijgt pijltjes, dots en swipe. Niet live zichtbaar in de editor, alleen op de front-end/preview.', 'szm-hover-animations' ),
-							checked: !! attributes.szmGsapSlider,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapSlider: value } );
-							},
+						{ title: __( 'GSAP effect', 'szm-hover-animations' ), initialOpen: false },
+
+						// core/columns: slider of sticky proces-stappen.
+						showColumnsFamily && el( SelectControl, {
+							label: __( 'Effect', 'szm-hover-animations' ),
+							value: columnsEffect,
+							options: mapToOptions( GSAP_COLUMNS_OPTIONS_MAP ),
+							onChange: handleColumnsEffectChange,
 						} ),
-						!! attributes.szmGsapSlider && el( RangeControl, {
+						showColumnsFamily && columnsEffect === 'slider' && el( RangeControl, {
 							label: __( 'Overgangssnelheid (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapSliderSpeed || DEFAULT_SLIDER_SPEED,
 							onChange: function ( value ) {
@@ -379,21 +577,22 @@
 							max: 1500,
 							step: 50,
 						} ),
-						!! attributes.szmGsapSlider && el( ToggleControl, {
+						showColumnsFamily && columnsEffect === 'slider' && easingControl(),
+						showColumnsFamily && columnsEffect === 'slider' && el( ToggleControl, {
 							label: __( 'Loop (na laatste slide terug naar eerste)', 'szm-hover-animations' ),
 							checked: attributes.szmGsapSliderLoop !== false,
 							onChange: function ( value ) {
 								setAttributes( { szmGsapSliderLoop: value } );
 							},
 						} ),
-						!! attributes.szmGsapSlider && el( ToggleControl, {
+						showColumnsFamily && columnsEffect === 'slider' && el( ToggleControl, {
 							label: __( 'Automatisch doorschuiven', 'szm-hover-animations' ),
 							checked: !! attributes.szmGsapSliderAutoplay,
 							onChange: function ( value ) {
 								setAttributes( { szmGsapSliderAutoplay: value } );
 							},
 						} ),
-						!! attributes.szmGsapSlider && !! attributes.szmGsapSliderAutoplay && el( RangeControl, {
+						showColumnsFamily && columnsEffect === 'slider' && !! attributes.szmGsapSliderAutoplay && el( RangeControl, {
 							label: __( 'Tijd per slide (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapSliderAutoplaySpeed || DEFAULT_SLIDER_AUTOPLAY_SPEED,
 							onChange: function ( value ) {
@@ -402,32 +601,22 @@
 							min: 1500,
 							max: 10000,
 							step: 500,
-						} )
-					),
-					showGsapProcess && el(
-						PanelBody,
-						{ title: __( 'GSAP: Sticky process-stappen', 'szm-hover-animations' ), initialOpen: false },
-						el( ToggleControl, {
-							label: __( 'Kolommen als sticky proces-stappen tonen', 'szm-hover-animations' ),
-							help: __( 'Eerste kolom (bv. afbeelding) blijft vastgepind staan terwijl de directe kind-blokken in de tweede kolom één voor één inklappen — het eerste element van elk kind-blok blijft de kop, de rest is de inklappende inhoud (bekend van "hoe werkt het"-secties). Sluit elkaar uit met de slider hierboven op hetzelfde blok — staat die ook aan, dan wint de slider. Niet live zichtbaar in de editor, alleen op de front-end/preview.', 'szm-hover-animations' ),
-							checked: !! attributes.szmGsapProcess,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapProcess: value } );
-							},
-						} )
-					),
-					showAccordion && el(
-						PanelBody,
-						{ title: __( 'GSAP: Accordion', 'szm-hover-animations' ), initialOpen: false },
-						el( ToggleControl, {
-							label: __( 'Kind-blokken als accordion tonen', 'szm-hover-animations' ),
-							help: __( 'Het eerste element van elk direct kind-blok wordt de klikbare kop, de rest is de inklapbare inhoud. Niet live zichtbaar in de editor, alleen op de front-end/preview.', 'szm-hover-animations' ),
-							checked: !! attributes.szmGsapAccordion,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapAccordion: value } );
-							},
 						} ),
-						!! attributes.szmGsapAccordion && el( RangeControl, {
+						showColumnsFamily && columnsEffect === 'process' && pinStartControl(),
+						showColumnsFamily && columnsEffect === 'process' && processScrollLengthControl(),
+						showColumnsFamily && columnsEffect === 'process' && lockAndCenterControls(),
+						showColumnsFamily && columnsEffect === 'process' && el( 'p', { className: 'components-base-control__help' },
+							__( 'Bij 2+ kolommen blijft de eerste (bv. afbeelding) vastgepind staan terwijl de directe kind-blokken in de tweede kolom één voor één inklappen. Bij 1 kolom pint de kolom zelf en klappen haar eigen kind-blokken in. Niet live zichtbaar in de editor, alleen op de front-end/preview.', 'szm-hover-animations' )
+						),
+
+						// core/group: accordion, horizontal scroll of full-viewport slides.
+						showGroupFamily && el( SelectControl, {
+							label: __( 'Effect', 'szm-hover-animations' ),
+							value: groupEffect,
+							options: mapToOptions( GSAP_GROUP_OPTIONS_MAP ),
+							onChange: handleGroupEffectChange,
+						} ),
+						showGroupFamily && groupEffect === 'accordion' && el( RangeControl, {
 							label: __( 'Snelheid (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapAccordionSpeed || DEFAULT_ACCORDION_SPEED,
 							onChange: function ( value ) {
@@ -437,14 +626,15 @@
 							max: 1000,
 							step: 50,
 						} ),
-						!! attributes.szmGsapAccordion && el( ToggleControl, {
+						showGroupFamily && groupEffect === 'accordion' && easingControl(),
+						showGroupFamily && groupEffect === 'accordion' && el( ToggleControl, {
 							label: __( 'Meerdere panelen tegelijk open toestaan', 'szm-hover-animations' ),
 							checked: !! attributes.szmGsapAccordionMultiple,
 							onChange: function ( value ) {
 								setAttributes( { szmGsapAccordionMultiple: value } );
 							},
 						} ),
-						!! attributes.szmGsapAccordion && el( RangeControl, {
+						showGroupFamily && groupEffect === 'accordion' && el( RangeControl, {
 							label: __( 'Standaard geopend paneel (-1 = alles dicht)', 'szm-hover-animations' ),
 							value: typeof attributes.szmGsapAccordionDefaultOpen === 'number' ? attributes.szmGsapAccordionDefaultOpen : -1,
 							onChange: function ( value ) {
@@ -453,20 +643,49 @@
 							min: -1,
 							max: 10,
 							step: 1,
-						} )
-					),
-					showGsapVideo && el(
-						PanelBody,
-						{ title: __( 'GSAP: Video animatie', 'szm-hover-animations' ), initialOpen: false },
-						el( SelectControl, {
-							label: __( 'Effect', 'szm-hover-animations' ),
+						} ),
+						showGroupFamily && groupEffect === 'horizontal' && el( SelectControl, {
+							label: __( 'Weergave', 'szm-hover-animations' ),
+							value: attributes.szmGsapHorizontalMode || 'scroll',
+							options: mapToOptions( HORIZONTAL_MODE_OPTIONS_MAP ),
+							onChange: function ( value ) {
+								setAttributes( { szmGsapHorizontalMode: value } );
+							},
+						} ),
+						showGroupFamily && groupEffect === 'horizontal' && pinStartControl(),
+						showGroupFamily && groupEffect === 'horizontal' && lockAndCenterControls(),
+						showGroupFamily && groupEffect === 'horizontal' && el( 'p', { className: 'components-base-control__help' },
+							__( 'Pint deze Group vast en scrollt zijn directe kind-blokken horizontaal mee met verticaal scrollen ("Zijwaarts scrollen"), of stapelt ze als kaarten op elkaar zonder zijwaartse beweging ("Stapelen"). Niet live zichtbaar in de editor.', 'szm-hover-animations' )
+						),
+						showGroupFamily && groupEffect === 'fullpage' && el( SelectControl, {
+							label: __( 'Overgangsstijl', 'szm-hover-animations' ),
+							value: attributes.szmGsapFullpageTransition || 'fade',
+							options: mapToOptions( FULLPAGE_TRANSITION_OPTIONS_MAP ),
+							onChange: function ( value ) {
+								setAttributes( { szmGsapFullpageTransition: value } );
+							},
+						} ),
+						showGroupFamily && groupEffect === 'fullpage' && lockHeadingControl(),
+						showGroupFamily && groupEffect === 'fullpage' && el( 'p', { className: 'components-base-control__help' },
+							__( 'Elk direct kind-blok wordt een volledig-scherm paneel; scrollen wisselt naar het volgende paneel volgens de gekozen overgangsstijl. Begint altijd direct bovenaan (geen "wanneer begint pinnen"-keuze) — anders past het paneel niet meer op het volledige scherm. Niet live zichtbaar in de editor.', 'szm-hover-animations' )
+						),
+						showGroupFamily && groupEffect === 'process' && pinStartControl(),
+						showGroupFamily && groupEffect === 'process' && processScrollLengthControl(),
+						showGroupFamily && groupEffect === 'process' && lockAndCenterControls(),
+						showGroupFamily && groupEffect === 'process' && el( 'p', { className: 'components-base-control__help' },
+							__( 'Elk direct kind-blok van deze Group is één stap: het eerste element erin blijft zichtbaar als "header", de rest klapt in tijdens scrollen (zelfde vorm als Accordion-panelen). De hele Group pint tijdens dat inklappen. Niet live zichtbaar in de editor.', 'szm-hover-animations' )
+						),
+
+						// core/video, core/cover.
+						showGsapVideo && el( SelectControl, {
+							label: __( 'Video-effect', 'szm-hover-animations' ),
 							value: attributes.szmGsapVideoEffect || '',
 							options: mapToOptions( GSAP_VIDEO_OPTIONS_MAP ),
 							onChange: function ( value ) {
 								setAttributes( { szmGsapVideoEffect: value } );
 							},
 						} ),
-						attributes.szmGsapVideoEffect === 'parallax' && el( RangeControl, {
+						showGsapVideo && attributes.szmGsapVideoEffect === 'parallax' && el( RangeControl, {
 							label: __( 'Parallax-intensiteit (%)', 'szm-hover-animations' ),
 							value: attributes.szmGsapVideoSpeed || DEFAULT_VIDEO_SPEED,
 							onChange: function ( value ) {
@@ -476,7 +695,7 @@
 							max: 50,
 							step: 5,
 						} ),
-						attributes.szmGsapVideoEffect === 'reveal' && el( RangeControl, {
+						showGsapVideo && attributes.szmGsapVideoEffect === 'reveal' && el( RangeControl, {
 							label: __( 'Snelheid (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapVideoSpeed || 800,
 							onChange: function ( value ) {
@@ -486,7 +705,8 @@
 							max: 2000,
 							step: 100,
 						} ),
-						attributes.szmGsapVideoEffect === 'scrub' && el( RangeControl, {
+						showGsapVideo && attributes.szmGsapVideoEffect === 'reveal' && easingControl(),
+						showGsapVideo && attributes.szmGsapVideoEffect === 'scrub' && el( RangeControl, {
 							label: __( 'Scrollafstand (% van schermhoogte)', 'szm-hover-animations' ),
 							help: __( 'Hoe ver iemand moet scrollen om de hele video af te spelen. De video wordt vastgepind tijdens het scrubben.', 'szm-hover-animations' ),
 							value: attributes.szmGsapVideoSpeed || 200,
@@ -496,13 +716,13 @@
 							min: 100,
 							max: 500,
 							step: 25,
-						} )
-					),
-					showGsapText && el(
-						PanelBody,
-						{ title: __( 'GSAP: Tekst-reveal (SplitText)', 'szm-hover-animations' ), initialOpen: false },
-						el( SelectControl, {
-							label: __( 'Opsplitsen en onthullen', 'szm-hover-animations' ),
+						} ),
+						showGsapVideo && attributes.szmGsapVideoEffect === 'scrub' && pinStartControl(),
+						showGsapVideo && attributes.szmGsapVideoEffect === 'scrub' && lockAndCenterControls(),
+
+						// core/heading, core/paragraph: tekst-reveal (SplitText).
+						showGsapText && el( SelectControl, {
+							label: __( 'Tekst-reveal (SplitText)', 'szm-hover-animations' ),
 							value: attributes.szmGsapText || '',
 							options: mapToOptions( GSAP_TEXT_OPTIONS_MAP ),
 							onChange: function ( value ) {
@@ -510,7 +730,7 @@
 							},
 							help: __( 'Splitst de tekst met SplitText en onthult per letter/woord/regel bij scrollen in beeld. Niet live zichtbaar in de editor.', 'szm-hover-animations' ),
 						} ),
-						!! attributes.szmGsapText && el( RangeControl, {
+						showGsapText && !! attributes.szmGsapText && el( RangeControl, {
 							label: __( 'Snelheid per eenheid (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapTextSpeed || DEFAULT_TEXT_SPEED,
 							onChange: function ( value ) {
@@ -520,7 +740,7 @@
 							max: 1500,
 							step: 50,
 						} ),
-						!! attributes.szmGsapText && el( RangeControl, {
+						showGsapText && !! attributes.szmGsapText && el( RangeControl, {
 							label: __( 'Stagger tussen eenheden (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapTextStagger || DEFAULT_TEXT_STAGGER,
 							onChange: function ( value ) {
@@ -529,12 +749,32 @@
 							min: 0,
 							max: 150,
 							step: 5,
-						} )
-					),
-					showGsapCounter && el(
-						PanelBody,
-						{ title: __( 'GSAP: Animated counter', 'szm-hover-animations' ), initialOpen: false },
-						el( ToggleControl, {
+						} ),
+						showGsapText && !! attributes.szmGsapText && easingControl(),
+
+						// Herhalen: één instelling voor tekst-reveal + counter samen (kan
+						// allebei tegelijk op dezelfde Heading staan), aan by default.
+						( ( showGsapText && !! attributes.szmGsapText ) || ( showGsapCounter && !! attributes.szmGsapCounter ) ) && el( ToggleControl, {
+							label: __( 'Na een tijdje herhalen (verdwijnen + opnieuw afspelen)', 'szm-hover-animations' ),
+							help: __( 'Zolang dit blok in beeld blijft, speelt de animatie na de ingestelde wachttijd steeds opnieuw af, in dezelfde stijl als de eerste keer.', 'szm-hover-animations' ),
+							checked: attributes.szmGsapLoop !== false,
+							onChange: function ( value ) {
+								setAttributes( { szmGsapLoop: value } );
+							},
+						} ),
+						( ( showGsapText && !! attributes.szmGsapText ) || ( showGsapCounter && !! attributes.szmGsapCounter ) ) && attributes.szmGsapLoop !== false && el( SelectControl, {
+							label: __( 'Wachttijd voor herhalen', 'szm-hover-animations' ),
+							value: attributes.szmGsapLoopDelay || DEFAULT_LOOP_DELAY,
+							options: mapToOptions( LOOP_DELAY_OPTIONS_MAP ),
+							onChange: function ( value ) {
+								setAttributes( { szmGsapLoopDelay: value } );
+							},
+						} ),
+
+						// core/heading: animated counter — bewust los van tekst-reveal
+						// hierboven (kan op dezelfde Heading tegelijk aan staan, bv. een
+						// "500+ klanten"-cijfer dat zowel telt als per letter onthult).
+						showGsapCounter && el( ToggleControl, {
 							label: __( 'Getal optellen bij in beeld scrollen', 'szm-hover-animations' ),
 							help: __( 'Herkent het eerste getal in de tekst van deze Heading en telt het op van 0 naar dat getal. Voeg zelf een € of % toe in de tekst; die blijft staan. Niet live zichtbaar in de editor.', 'szm-hover-animations' ),
 							checked: !! attributes.szmGsapCounter,
@@ -542,7 +782,7 @@
 								setAttributes( { szmGsapCounter: value } );
 							},
 						} ),
-						!! attributes.szmGsapCounter && el( RangeControl, {
+						showGsapCounter && !! attributes.szmGsapCounter && el( RangeControl, {
 							label: __( 'Duur (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapCounterSpeed || DEFAULT_COUNTER_SPEED,
 							onChange: function ( value ) {
@@ -551,12 +791,10 @@
 							min: 300,
 							max: 4000,
 							step: 100,
-						} )
-					),
-					showGsapMagnetic && el(
-						PanelBody,
-						{ title: __( 'GSAP: Magnetic button', 'szm-hover-animations' ), initialOpen: false },
-						el( ToggleControl, {
+						} ),
+
+						// core/button: magnetic.
+						showGsapMagnetic && el( ToggleControl, {
 							label: __( 'Knop volgt de cursor (magnetisch)', 'szm-hover-animations' ),
 							help: __( 'De knop trekt lichtjes mee met de muis binnen zijn eigen omtrek. Op touchscreens (geen cursor) geeft een tik in plaats daarvan een korte "pols"-animatie. Niet live zichtbaar in de editor, alleen op de front-end.', 'szm-hover-animations' ),
 							checked: !! attributes.szmGsapMagnetic,
@@ -564,7 +802,7 @@
 								setAttributes( { szmGsapMagnetic: value } );
 							},
 						} ),
-						!! attributes.szmGsapMagnetic && el( RangeControl, {
+						showGsapMagnetic && !! attributes.szmGsapMagnetic && el( RangeControl, {
 							label: __( 'Trekkracht (px)', 'szm-hover-animations' ),
 							value: attributes.szmGsapMagneticStrength || DEFAULT_MAGNETIC_STRENGTH,
 							onChange: function ( value ) {
@@ -573,36 +811,11 @@
 							min: 10,
 							max: 100,
 							step: 5,
-						} )
-					),
-					showGsapHorizontal && el(
-						PanelBody,
-						{ title: __( 'GSAP: Horizontal scroll', 'szm-hover-animations' ), initialOpen: false },
-						el( ToggleControl, {
-							label: __( 'Kind-blokken horizontaal vastpinnen en scrollen', 'szm-hover-animations' ),
-							help: __( 'Pint deze Group vast en scrollt zijn directe kind-blokken horizontaal mee met verticaal scrollen (bekend van awwwards-sites). Sluit elkaar uit met de accordion hierboven op hetzelfde blok — staat die ook aan, dan wint de accordion. Niet live zichtbaar in de editor.', 'szm-hover-animations' ),
-							checked: !! attributes.szmGsapHorizontal,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapHorizontal: value } );
-							},
-						} )
-					),
-					showGsapFullpage && el(
-						PanelBody,
-						{ title: __( 'GSAP: Full-viewport scroll slides', 'szm-hover-animations' ), initialOpen: false },
-						el( ToggleControl, {
-							label: __( 'Kind-blokken als volledig-scherm scroll-slides tonen', 'szm-hover-animations' ),
-							help: __( 'Elk direct kind-blok wordt een volledig-scherm paneel; scrollen kruisfade\'t naar het volgende paneel (bekend van Apple-productpagina\'s). Sluit elkaar uit met accordion en horizontal scroll hierboven op hetzelfde blok — staat een van die twee ook aan, dan wint die. Niet live zichtbaar in de editor.', 'szm-hover-animations' ),
-							checked: !! attributes.szmGsapFullpage,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapFullpage: value } );
-							},
-						} )
-					),
-					showGsapMarquee && el(
-						PanelBody,
-						{ title: __( 'GSAP: Infinite marquee', 'szm-hover-animations' ), initialOpen: false },
-						el( ToggleControl, {
+						} ),
+						showGsapMagnetic && !! attributes.szmGsapMagnetic && easingControl(),
+
+						// core/list: infinite marquee.
+						showGsapMarquee && el( ToggleControl, {
 							label: __( 'Lijst-items eindeloos laten doorschuiven', 'szm-hover-animations' ),
 							help: __( 'De lijst-items dupliceren zichzelf en schuiven naadloos in een lus door (logo-strip, testimonials, tags). Pauzeert bij hover; op touchscreens zet een tik pauzeren/doorlopen om. Niet live zichtbaar in de editor.', 'szm-hover-animations' ),
 							checked: !! attributes.szmGsapMarquee,
@@ -610,7 +823,7 @@
 								setAttributes( { szmGsapMarquee: value } );
 							},
 						} ),
-						!! attributes.szmGsapMarquee && el( SelectControl, {
+						showGsapMarquee && !! attributes.szmGsapMarquee && el( SelectControl, {
 							label: __( 'Richting', 'szm-hover-animations' ),
 							value: attributes.szmGsapMarqueeDirection || 'left',
 							options: [
@@ -621,7 +834,7 @@
 								setAttributes( { szmGsapMarqueeDirection: value } );
 							},
 						} ),
-						!! attributes.szmGsapMarquee && el( RangeControl, {
+						showGsapMarquee && !! attributes.szmGsapMarquee && el( RangeControl, {
 							label: __( 'Tijd per volledige loop (s)', 'szm-hover-animations' ),
 							value: attributes.szmGsapMarqueeSpeed || DEFAULT_MARQUEE_SPEED,
 							onChange: function ( value ) {
@@ -648,77 +861,123 @@
 	function addSaveProps( extraProps, blockType, attributes ) {
 		var classes = [];
 		var style   = Object.assign( {}, extraProps.style );
+		var name    = blockType.name;
 
-		if ( isHoverSupported( blockType.name ) && attributes.szmHoverAnimation ) {
+		if ( isHoverSupported( name ) && attributes.szmHoverAnimation ) {
 			classes.push( 'szm-hover', classForHover( attributes.szmHoverAnimation ) );
 			style[ '--szm-hover-speed' ] = ( attributes.szmHoverSpeed || DEFAULT_HOVER_SPEED ) + 'ms';
+			style[ '--szm-hover-ease' ]  = EASE_CSS_MAP[ attributes.szmHoverEasing || DEFAULT_EASING ] || EASE_CSS_MAP[ DEFAULT_EASING ];
 		}
 
-		if ( isHoverSupported( blockType.name ) && attributes.szmHoverGroup ) {
+		if ( isHoverSupported( name ) && attributes.szmHoverGroup ) {
 			classes.push( 'szm-hover-group' );
 		}
 
-		if ( isEntranceSupported( blockType.name ) && attributes.szmEntranceAnimation ) {
+		if ( isEntranceSupported( name ) && attributes.szmEntranceAnimation ) {
 			classes.push( 'szm-entrance', classForEntrance( attributes.szmEntranceAnimation ) );
 			style[ '--szm-entrance-speed' ] = ( attributes.szmEntranceSpeed || DEFAULT_ENTRANCE_SPEED ) + 'ms';
 			style[ '--szm-entrance-delay' ] = ( attributes.szmEntranceDelay || 0 ) + 'ms';
+			style[ '--szm-entrance-ease' ]  = EASE_CSS_MAP[ attributes.szmEntranceEasing || DEFAULT_EASING ] || EASE_CSS_MAP[ DEFAULT_EASING ];
 		}
 
-		if ( isSliderSupported( blockType.name ) && attributes.szmGsapSlider ) {
-			classes.push( 'szm-gsap-slider' );
-			extraProps[ 'data-szm-slider-speed' ]          = attributes.szmGsapSliderSpeed || DEFAULT_SLIDER_SPEED;
-			extraProps[ 'data-szm-slider-autoplay' ]       = !! attributes.szmGsapSliderAutoplay;
-			extraProps[ 'data-szm-slider-autoplay-speed' ] = attributes.szmGsapSliderAutoplaySpeed || DEFAULT_SLIDER_AUTOPLAY_SPEED;
-			extraProps[ 'data-szm-slider-loop' ]           = attributes.szmGsapSliderLoop !== false;
+		// core/columns: slider XOR sticky proces-stappen, via het nieuwe
+		// szmGsapEffect-attribute met fallback op de oude losse toggles voor
+		// content die is opgeslagen vóór v1.9.0 (zie legacyColumnsEffect).
+		if ( isColumnsFamily( name ) ) {
+			var columnsEffect = attributes.szmGsapEffect || legacyColumnsEffect( attributes );
+
+			if ( columnsEffect === 'slider' ) {
+				classes.push( 'szm-gsap-slider' );
+				extraProps[ 'data-szm-slider-speed' ]          = attributes.szmGsapSliderSpeed || DEFAULT_SLIDER_SPEED;
+				extraProps[ 'data-szm-slider-autoplay' ]       = !! attributes.szmGsapSliderAutoplay;
+				extraProps[ 'data-szm-slider-autoplay-speed' ] = attributes.szmGsapSliderAutoplaySpeed || DEFAULT_SLIDER_AUTOPLAY_SPEED;
+				extraProps[ 'data-szm-slider-loop' ]           = attributes.szmGsapSliderLoop !== false;
+				extraProps[ 'data-szm-ease' ]                  = attributes.szmGsapEasing || DEFAULT_EASING;
+			} else if ( columnsEffect === 'process' ) {
+				classes.push( 'szm-gsap-process' );
+				extraProps[ 'data-szm-pin-start' ]     = attributes.szmGsapPinStart || DEFAULT_PIN_START;
+				extraProps[ 'data-szm-scroll-length' ] = attributes.szmGsapProcessScrollLength || DEFAULT_PROCESS_SCROLL_LENGTH;
+				extraProps[ 'data-szm-lock-heading' ]  = !! attributes.szmGsapLockHeading;
+				extraProps[ 'data-szm-vertical-center' ] = !! attributes.szmGsapVerticalCenter;
+			}
 		}
 
-		// Sticky process-stappen sluit de slider hierboven uit op hetzelfde blok
-		// (core/columns) — bij beide aan wint de slider.
-		if ( isGsapProcessSupported( blockType.name ) && attributes.szmGsapProcess && ! attributes.szmGsapSlider ) {
-			classes.push( 'szm-gsap-process' );
+		// core/group: accordion, horizontal scroll, full-viewport slides of
+		// proces-stappen — zelfde patroon, fallback op de oude toggles via
+		// legacyGroupEffect (process heeft geen legacy boolean, is nieuw).
+		if ( isGroupFamily( name ) ) {
+			var groupEffect = attributes.szmGsapEffect || legacyGroupEffect( attributes );
+
+			if ( groupEffect === 'accordion' ) {
+				classes.push( 'szm-gsap-accordion' );
+				extraProps[ 'data-szm-accordion-speed' ]        = attributes.szmGsapAccordionSpeed || DEFAULT_ACCORDION_SPEED;
+				extraProps[ 'data-szm-accordion-multiple' ]     = !! attributes.szmGsapAccordionMultiple;
+				extraProps[ 'data-szm-accordion-default-open' ] = typeof attributes.szmGsapAccordionDefaultOpen === 'number' ? attributes.szmGsapAccordionDefaultOpen : -1;
+				extraProps[ 'data-szm-ease' ]                   = attributes.szmGsapEasing || DEFAULT_EASING;
+			} else if ( groupEffect === 'horizontal' ) {
+				classes.push( 'szm-gsap-horizontal' );
+				extraProps[ 'data-szm-pin-start' ]       = attributes.szmGsapPinStart || DEFAULT_PIN_START;
+				extraProps[ 'data-szm-horizontal-mode' ] = attributes.szmGsapHorizontalMode || 'scroll';
+				extraProps[ 'data-szm-lock-heading' ]    = !! attributes.szmGsapLockHeading;
+				extraProps[ 'data-szm-vertical-center' ] = !! attributes.szmGsapVerticalCenter;
+			} else if ( groupEffect === 'fullpage' ) {
+				classes.push( 'szm-gsap-fullpage' );
+				// Bewust geen data-szm-pin-start: full-viewport slides moeten altijd
+				// exact bovenaan pinnen, anders past het paneel niet meer op het
+				// volledige scherm. gsap-effects.js corrigeert hier nog wel
+				// automatisch voor een sticky header/adminbalk.
+				extraProps[ 'data-szm-fullpage-transition' ] = attributes.szmGsapFullpageTransition || 'fade';
+				extraProps[ 'data-szm-lock-heading' ]        = !! attributes.szmGsapLockHeading;
+			} else if ( groupEffect === 'process' ) {
+				classes.push( 'szm-gsap-process' );
+				extraProps[ 'data-szm-pin-start' ]       = attributes.szmGsapPinStart || DEFAULT_PIN_START;
+				extraProps[ 'data-szm-scroll-length' ]   = attributes.szmGsapProcessScrollLength || DEFAULT_PROCESS_SCROLL_LENGTH;
+				extraProps[ 'data-szm-lock-heading' ]    = !! attributes.szmGsapLockHeading;
+				extraProps[ 'data-szm-vertical-center' ] = !! attributes.szmGsapVerticalCenter;
+			}
 		}
 
-		if ( isAccordionSupported( blockType.name ) && attributes.szmGsapAccordion ) {
-			classes.push( 'szm-gsap-accordion' );
-			extraProps[ 'data-szm-accordion-speed' ]        = attributes.szmGsapAccordionSpeed || DEFAULT_ACCORDION_SPEED;
-			extraProps[ 'data-szm-accordion-multiple' ]     = !! attributes.szmGsapAccordionMultiple;
-			extraProps[ 'data-szm-accordion-default-open' ] = typeof attributes.szmGsapAccordionDefaultOpen === 'number' ? attributes.szmGsapAccordionDefaultOpen : -1;
-		}
-
-		if ( isGsapVideoSupported( blockType.name ) && attributes.szmGsapVideoEffect ) {
+		if ( isGsapVideoSupported( name ) && attributes.szmGsapVideoEffect ) {
 			classes.push( classForGsapVideo( attributes.szmGsapVideoEffect ) );
 			extraProps[ 'data-szm-video-speed' ] = attributes.szmGsapVideoSpeed || DEFAULT_VIDEO_SPEED;
+
+			if ( attributes.szmGsapVideoEffect === 'scrub' ) {
+				extraProps[ 'data-szm-pin-start' ]       = attributes.szmGsapPinStart || DEFAULT_PIN_START;
+				extraProps[ 'data-szm-lock-heading' ]    = !! attributes.szmGsapLockHeading;
+				extraProps[ 'data-szm-vertical-center' ] = !! attributes.szmGsapVerticalCenter;
+			}
+			if ( attributes.szmGsapVideoEffect === 'reveal' ) {
+				extraProps[ 'data-szm-ease' ] = attributes.szmGsapEasing || DEFAULT_EASING;
+			}
 		}
 
-		if ( isGsapTextSupported( blockType.name ) && attributes.szmGsapText ) {
+		if ( isGsapTextSupported( name ) && attributes.szmGsapText ) {
 			classes.push( 'szm-gsap-text', classForGsapText( attributes.szmGsapText ) );
 			extraProps[ 'data-szm-text-speed' ]   = attributes.szmGsapTextSpeed || DEFAULT_TEXT_SPEED;
 			extraProps[ 'data-szm-text-stagger' ] = attributes.szmGsapTextStagger || DEFAULT_TEXT_STAGGER;
+			extraProps[ 'data-szm-ease' ]         = attributes.szmGsapEasing || DEFAULT_EASING;
+			extraProps[ 'data-szm-loop' ]         = attributes.szmGsapLoop !== false;
+			extraProps[ 'data-szm-loop-delay' ]   = attributes.szmGsapLoopDelay || DEFAULT_LOOP_DELAY;
 		}
 
-		if ( isGsapCounterSupported( blockType.name ) && attributes.szmGsapCounter ) {
+		if ( isGsapCounterSupported( name ) && attributes.szmGsapCounter ) {
 			classes.push( 'szm-gsap-counter' );
 			extraProps[ 'data-szm-counter-speed' ] = attributes.szmGsapCounterSpeed || DEFAULT_COUNTER_SPEED;
+			// Heading zit sowieso al in de tekst-reveal-familie, dus szmGsapEasing
+			// staat al geregistreerd — hergebruik 'm hier zodat de counter niet
+			// zijn eigen losse easing-instelling nodig heeft.
+			extraProps[ 'data-szm-ease' ]       = attributes.szmGsapEasing || DEFAULT_EASING;
+			extraProps[ 'data-szm-loop' ]       = attributes.szmGsapLoop !== false;
+			extraProps[ 'data-szm-loop-delay' ] = attributes.szmGsapLoopDelay || DEFAULT_LOOP_DELAY;
 		}
 
-		if ( isGsapMagneticSupported( blockType.name ) && attributes.szmGsapMagnetic ) {
+		if ( isGsapMagneticSupported( name ) && attributes.szmGsapMagnetic ) {
 			classes.push( 'szm-gsap-magnetic' );
 			extraProps[ 'data-szm-magnetic-strength' ] = attributes.szmGsapMagneticStrength || DEFAULT_MAGNETIC_STRENGTH;
+			extraProps[ 'data-szm-ease' ]               = attributes.szmGsapEasing || DEFAULT_EASING;
 		}
 
-		// Horizontal scroll sluit accordion uit op hetzelfde blok (core/group) — bij
-		// beide aan wint de accordion (checked eerst hierboven, class staat al vast).
-		if ( isGsapHorizontalSupported( blockType.name ) && attributes.szmGsapHorizontal && ! attributes.szmGsapAccordion ) {
-			classes.push( 'szm-gsap-horizontal' );
-		}
-
-		// Fullpage sluit zowel accordion als horizontal scroll uit op hetzelfde blok —
-		// prioriteit accordion > horizontal > fullpage (elk verder in de keten checkt de vorige).
-		if ( isGsapFullpageSupported( blockType.name ) && attributes.szmGsapFullpage && ! attributes.szmGsapAccordion && ! attributes.szmGsapHorizontal ) {
-			classes.push( 'szm-gsap-fullpage' );
-		}
-
-		if ( isGsapMarqueeSupported( blockType.name ) && attributes.szmGsapMarquee ) {
+		if ( isGsapMarqueeSupported( name ) && attributes.szmGsapMarquee ) {
 			classes.push( 'szm-gsap-marquee' );
 			extraProps[ 'data-szm-marquee-speed' ]     = attributes.szmGsapMarqueeSpeed || DEFAULT_MARQUEE_SPEED;
 			extraProps[ 'data-szm-marquee-direction' ] = attributes.szmGsapMarqueeDirection || 'left';
@@ -762,6 +1021,7 @@
 			if ( showHover ) {
 				classes.push( 'szm-hover', classForHover( attributes.szmHoverAnimation ) );
 				style[ '--szm-hover-speed' ] = ( attributes.szmHoverSpeed || DEFAULT_HOVER_SPEED ) + 'ms';
+				style[ '--szm-hover-ease' ]  = EASE_CSS_MAP[ attributes.szmHoverEasing || DEFAULT_EASING ] || EASE_CSS_MAP[ DEFAULT_EASING ];
 			}
 
 			if ( showHoverGroup ) {
@@ -772,6 +1032,7 @@
 				classes.push( 'szm-entrance', 'szm-entrance-revealed', classForEntrance( attributes.szmEntranceAnimation ) );
 				style[ '--szm-entrance-speed' ] = ( attributes.szmEntranceSpeed || DEFAULT_ENTRANCE_SPEED ) + 'ms';
 				style[ '--szm-entrance-delay' ] = ( attributes.szmEntranceDelay || 0 ) + 'ms';
+				style[ '--szm-entrance-ease' ]  = EASE_CSS_MAP[ attributes.szmEntranceEasing || DEFAULT_EASING ] || EASE_CSS_MAP[ DEFAULT_EASING ];
 			}
 
 			var wrapperProps = Object.assign( {}, props.wrapperProps, {

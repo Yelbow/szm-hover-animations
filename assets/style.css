@@ -12,10 +12,10 @@
  */
 
 .szm-hover {
-	transition: transform var(--szm-hover-speed, 0.25s) ease,
-		box-shadow var(--szm-hover-speed, 0.25s) ease,
-		opacity var(--szm-hover-speed, 0.25s) ease,
-		filter var(--szm-hover-speed, 0.25s) ease;
+	transition: transform var(--szm-hover-speed, 0.25s) var(--szm-hover-ease, ease),
+		box-shadow var(--szm-hover-speed, 0.25s) var(--szm-hover-ease, ease),
+		opacity var(--szm-hover-speed, 0.25s) var(--szm-hover-ease, ease),
+		filter var(--szm-hover-speed, 0.25s) var(--szm-hover-ease, ease);
 	will-change: transform;
 }
 
@@ -132,8 +132,8 @@
  * Entrance animaties.
  */
 .szm-entrance {
-	transition: opacity var(--szm-entrance-speed, 0.5s) ease,
-		transform var(--szm-entrance-speed, 0.5s) ease;
+	transition: opacity var(--szm-entrance-speed, 0.5s) var(--szm-entrance-ease, ease),
+		transform var(--szm-entrance-speed, 0.5s) var(--szm-entrance-ease, ease);
 	transition-delay: var(--szm-entrance-delay, 0s);
 	opacity: 0;
 	will-change: opacity, transform;
@@ -171,7 +171,9 @@
 		var(--szm-hover-speed, 0.25s),
 		var(--szm-entrance-speed, 0.5s),
 		var(--szm-hover-speed, 0.25s);
-	transition-timing-function: ease;
+	transition-timing-function:
+		var(--szm-entrance-ease, ease), var(--szm-hover-ease, ease),
+		var(--szm-entrance-ease, ease), var(--szm-hover-ease, ease);
 	transition-delay:
 		var(--szm-entrance-delay, 0s), 0s,
 		var(--szm-entrance-delay, 0s), 0s;

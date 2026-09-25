@@ -70,6 +70,124 @@
 		return isNaN( n ) ? fallback : n;
 	}
 
+	// Curated easing-presets → concrete GSAP-ease. CSS-kant van dezelfde
+	// presets staat in assets/editor.js (EASE_CSS_MAP) en wordt daar als
+	// --szm-hover-ease/--szm-entrance-ease inline style gezet.
+	var EASE_GSAP_MAP = {
+		smooth: 'power2.out',
+		snappy: 'power4.out',
+		bouncy: 'back.out(1.7)',
+		linear: 'none',
+	};
+
+	function gsapEase( element ) {
+		var preset = element.getAttribute( 'data-szm-ease' );
+		return EASE_GSAP_MAP[ preset ] || EASE_GSAP_MAP.smooth;
+	}
+
+	/**
+	 * Hoogte (px) van alles dat fixed/sticky bovenaan de pagina staat — een
+	 * site-header en/of de WP-adminbalk (#wpadminbar, alleen zichtbaar
+	 * ingelogd). Elk gepind scroll-effect hieronder gebruikt dit om zijn
+	 * pin-startpunt te corrigeren, zodat het nooit half onder een vaste menu-
+	 * balk begint te pinnen — dit is geen gebruikersinstelling, dit moet
+	 * altijd kloppen, ongeacht welk "wanneer begint pinnen"-preset iemand
+	 * kiest. Meet opnieuw bij elke aanroep: een sticky header kan van hoogte
+	 * veranderen (bv. scroll-afhankelijke compacte header).
+	 */
+	function getFixedHeaderOffset() {
+		var offset = 0;
+
+		var adminBar = document.getElementById( 'wpadminbar' );
+		if ( adminBar && window.getComputedStyle( adminBar ).position === 'fixed' ) {
+			offset = Math.max( offset, adminBar.getBoundingClientRect().bottom );
+		}
+
+		var probeX = window.innerWidth / 2;
+		var probeY = Math.min( offset + 2, window.innerHeight - 1 );
+		var el = document.elementFromPoint ? document.elementFromPoint( probeX, probeY ) : null;
+
+		while ( el && el !== document.body && el !== document.documentElement ) {
+			var position = window.getComputedStyle( el ).position;
+			if ( position === 'fixed' || position === 'sticky' ) {
+				var rect = el.getBoundingClientRect();
+				if ( rect.top <= offset && rect.bottom > offset ) {
+					offset = Math.max( offset, rect.bottom );
+				}
+			}
+			el = el.parentElement;
+		}
+
+		return Math.round( offset );
+	}
+
+	/**
+	 * Bouwt een ScrollTrigger "start"-functie voor een gepind effect: het
+	 * preset (top/half/center — welk deel van het blok het triggerpunt is,
+	 * ingesteld via de "Wanneer begint het vastpinnen"-dropdown) plus de
+	 * automatische sticky-header-correctie hierboven. Een functie i.p.v. een
+	 * vaste string, zodat ScrollTrigger 'm bij elke refresh() herberekent
+	 * (bv. na een resize, of als de sticky header van hoogte verandert).
+	 */
+	function pinStartFn( element ) {
+		// "Verticaal centreren" wint van het pin-start-preset: ScrollTrigger's
+		// eigen "center center" start-syntax laat het blok simpelweg pinnen op
+		// de schermpositie waar het toevallig verticaal gecentreerd stond op het
+		// moment dat de pin ingaat, en blijft daar staan — geen aparte
+		// header-correctie nodig, het is niet tegen de bovenkant aan het pinnen.
+		if ( element.getAttribute( 'data-szm-vertical-center' ) === 'true' ) {
+			return function () {
+				return 'center center';
+			};
+		}
+		var preset = element.getAttribute( 'data-szm-pin-start' ) || 'top';
+		return function () {
+			var offset = getFixedHeaderOffset();
+			var fraction = preset === 'center' ? 0.5 : preset === 'half' ? 0.25 : 0;
+			return 'top ' + ( offset + window.innerHeight * fraction ) + 'px';
+		};
+	}
+
+	/**
+	 * "Blok erboven mee laten vastzetten" (data-szm-lock-heading): pint de
+	 * direct voorafgaande sibling van het effect-blok in sync met diens eigen
+	 * pin — zelfde trigger/start/end, dus ze gaan tegelijk aan en uit. Een
+	 * losse ScrollTrigger met pinSpacing:false (de hoofd-ScrollTrigger van het
+	 * effect zelf reserveert de scrollruimte al) i.p.v. de heading in dezelfde
+	 * ScrollTrigger te proppen — zo blijft elk effect zijn eigen onafhankelijke
+	 * trigger houden en hoeft er geen instelling op een ouder-element te komen
+	 * (zie DECISIONS.md, afgewogen tegen precies dat alternatief).
+	 */
+	function lockHeadingIfRequested( container, triggerVars ) {
+		if ( container.getAttribute( 'data-szm-lock-heading' ) !== 'true' ) {
+			return;
+		}
+		var heading = container.previousElementSibling;
+		if ( ! heading ) {
+			return;
+		}
+		window.ScrollTrigger.create( {
+			trigger: triggerVars.trigger || container,
+			start: triggerVars.start,
+			end: triggerVars.end,
+			pin: heading,
+			pinSpacing: false,
+		} );
+	}
+
+	/**
+	 * Zelfde correctie, maar altijd tegen het preset "top" — voor effecten
+	 * (full-viewport scroll slides) die geen "wanneer begint pinnen"-keuze
+	 * aanbieden omdat ze altijd exact bovenaan moeten beginnen om het scherm
+	 * te vullen, maar nog wel onder een sticky header/adminbalk vandaan
+	 * moeten blijven.
+	 */
+	function topPinStartFn() {
+		return function () {
+			return 'top ' + getFixedHeaderOffset() + 'px';
+		};
+	}
+
 	/**
 	 * Slider: applies to .szm-gsap-slider (core/columns). Each direct child
 	 * column becomes a full-width slide; container gets prev/next arrows and
@@ -94,6 +212,7 @@
 			var autoplay   = container.getAttribute( 'data-szm-slider-autoplay' ) === 'true';
 			var autoplayMs = num( container.getAttribute( 'data-szm-slider-autoplay-speed' ), 4000 );
 			var loop       = container.getAttribute( 'data-szm-slider-loop' ) !== 'false';
+			var ease       = gsapEase( container );
 			var index      = 0;
 			var timer      = null;
 
@@ -104,6 +223,11 @@
 			container.style.setProperty( 'display', 'flex', 'important' );
 			container.style.setProperty( 'flex-direction', 'row', 'important' );
 			container.style.setProperty( 'flex-wrap', 'nowrap', 'important' );
+			// Zonder dit wint WP's eigen block-gap (Layout-instelling van het
+			// Columns-blok, of een thema-default) van xPercent: elke slide zit
+			// dan een beetje verder naar rechts dan de vorige, oplopend met de
+			// index, omdat goTo() alleen met -100*index rekent en geen gap.
+			container.style.setProperty( 'gap', '0', 'important' );
 			slides.forEach( function ( slide ) {
 				slide.classList.add( 'szm-gsap-slide' );
 				slide.style.setProperty( 'flex', '0 0 100%', 'important' );
@@ -122,7 +246,7 @@
 				var offset = -100 * index;
 
 				if ( animate && ! prefersReducedMotion ) {
-					gsap.to( container, { xPercent: offset, duration: speed, ease: 'power2.out' } );
+					gsap.to( container, { xPercent: offset, duration: speed, ease: ease } );
 				} else {
 					gsap.set( container, { xPercent: offset } );
 				}
@@ -239,10 +363,17 @@
 	 * whose first element stays visible as the "header" and the rest
 	 * collapses to height 0 as the next step scrolls into place — the whole
 	 * block pins while that happens. Ported from studiozondermeer.nl's own
-	 * hand-written theme GSAP (a pinned, gsap.matchMedia-driven timeline)
-	 * into a reusable Inspector toggle. Desktop pins the whole block;
-	 * mobile pins only the text column instead (image column has no room
-	 * to stay beside it once columns stack), matching the original.
+	 * hand-written theme GSAP into a reusable Inspector toggle. Desktop pins
+	 * the whole block; mobile pins only the text column instead (image
+	 * column has no room to stay beside it once columns stack), matching
+	 * the original — decided once via window.innerWidth at init time, not
+	 * with gsap.matchMedia(): matchMedia's own deferred-evaluation timing
+	 * was measuring "top 80px" against the page's layout *before* later
+	 * effects further down in initGsapEffects()'s call order (e.g.
+	 * initHorizontalScroll()/initFullpage()) had inserted their own
+	 * pin-spacers, even after an explicit ScrollTrigger.refresh() — every
+	 * other pinned effect in this file (accordion/horizontal/fullpage/
+	 * video-scrub) is matchMedia-free and doesn't have this problem.
 	 */
 	function initProcessSteps() {
 		if ( prefersReducedMotion || ! window.ScrollTrigger ) {
@@ -250,16 +381,28 @@
 		}
 
 		document.querySelectorAll( '.szm-gsap-process' ).forEach( function ( container ) {
-			var columns = Array.prototype.slice.call( container.children ).filter( function ( child ) {
+			var directChildren = Array.prototype.slice.call( container.children ).filter( function ( child ) {
 				return child.nodeType === 1;
 			} );
+			var wpColumns = directChildren.filter( function ( child ) {
+				return child.classList.contains( 'wp-block-column' );
+			} );
 
-			if ( columns.length < 2 ) {
-				return;
+			// Drie vormen: Columns-blok met 2+ kolommen (eerste = sticky visual,
+			// tweede = stappen — het originele gedrag), Columns-blok met maar 1
+			// kolom, of een Group-blok (geen kolommen — de directe kind-blokken
+			// ZIJN de stappen). De laatste twee hebben geen aparte visual-kant.
+			var imageSide = null;
+			var textSide  = null;
+			if ( wpColumns.length >= 2 ) {
+				imageSide = wpColumns[ 0 ];
+				textSide  = wpColumns[ 1 ];
+			} else if ( wpColumns.length === 1 ) {
+				textSide = wpColumns[ 0 ];
+			} else {
+				textSide = container;
 			}
 
-			var imageSide = columns[ 0 ];
-			var textSide  = columns[ 1 ];
 			var items = Array.prototype.slice.call( textSide.children ).filter( function ( child ) {
 				return child.nodeType === 1;
 			} );
@@ -285,76 +428,69 @@
 				return content;
 			} );
 
-			// Scroll distance the pin holds for: one full viewport height per
-			// step that has to collapse. Using a fixed "+=Npx" formula instead
-			// of the original theme code's "end: 'bottom bottom'" — that only
-			// gives a usable scrub range when the *uncollapsed* content happens
-			// to be taller than one viewport, so with shorter step text (the
-			// common case for arbitrary editor content) it snapped shut almost
-			// instantly. Same fix pattern as initFullpage()'s pin distance.
-			var scrollDistance = '+=' + Math.max( 1, items.length - 1 ) * 100 + '%';
+			// Scroll distance the pin holds for: data-szm-scroll-length% of the
+			// viewport height per step that has to collapse (user-configurable
+			// "Scroll-afstand per stap" slider, default 100). Using a fixed
+			// "+=Npx" formula instead of the original theme code's
+			// "end: 'bottom bottom'" — that only gives a usable scrub range when
+			// the *uncollapsed* content happens to be taller than one viewport,
+			// so with shorter step text (the common case for arbitrary editor
+			// content) it snapped shut almost instantly. Same fix pattern as
+			// initFullpage()'s pin distance.
+			var stepPercent     = num( container.getAttribute( 'data-szm-scroll-length' ), 100 );
+			var scrollDistance  = '+=' + Math.max( 1, items.length - 1 ) * stepPercent + '%';
 
-			function buildTimeline( scrollTriggerVars ) {
-				var tl = gsap.timeline( { scrollTrigger: scrollTriggerVars } );
-				items.forEach( function ( item, i ) {
-					if ( i === items.length - 1 || ! contents[ i ] ) {
-						return;
-					}
-					tl.to( item, { marginBottom: 0, duration: 1, ease: 'none' } )
-						.to( contents[ i ], { height: 0, duration: 1, ease: 'none' }, '-=0.3' );
-				} );
-				return tl;
-			}
+			var isMobile = window.innerWidth < 800;
 
-			var mm = gsap.matchMedia();
-
-			// Desktop: pin the whole block (image column stays put beside the
-			// collapsing text column).
-			mm.add( '(min-width: 800px)', function () {
-				buildTimeline( {
-					trigger: container,
-					start: 'top 80px',
-					end: scrollDistance,
-					pin: true,
-					pinSpacing: false,
-					scrub: 1,
-					anticipatePin: 1,
-					invalidateOnRefresh: true,
-				} );
-
-				// gsap.matchMedia runs this cleanup automatically once the media
-				// query stops matching (e.g. window resized past 800px) — undoes
-				// the marginBottom/height tweens so a later resize starts clean.
-				return function () {
-					gsap.set( items, { clearProps: 'marginBottom' } );
-					gsap.set( contents.filter( Boolean ), { clearProps: 'height' } );
-				};
-			} );
-
-			// Mobiel: WP core stacks the columns, so pin the text column itself
-			// instead and lift it above the (now full-width, behind) image column.
-			mm.add( '(max-width: 799px)', function () {
+			// Mobiel + split-kolommen: WP core stapelt de kolommen, dus pin de
+			// tekstkolom zelf i.p.v. het hele blok en til 'm boven de (nu
+			// volle-breedte, erachter liggende) afbeeldingskolom uit. Zonder
+			// aparte visual-kant (1-koloms of Group) is dat niet nodig — er is
+			// niets om achter weg te vallen, dus pin altijd gewoon de container.
+			if ( isMobile && imageSide ) {
 				gsap.set( textSide, { position: 'relative', zIndex: 10 } );
 				gsap.set( imageSide, { zIndex: 1 } );
+			}
 
-				buildTimeline( {
-					trigger: textSide,
-					start: 'top 40px',
+			var pinTarget = ( isMobile && imageSide ) ? textSide : container;
+
+			// Was hardcoded 'top 80px'/'top 40px' (een educated guess om onder
+			// een sticky header te blijven) — nu de gebruikersinstelling
+			// ("Wanneer begint het vastpinnen") plus de automatische
+			// header/adminbalk-correctie, zie pinStartFn()/getFixedHeaderOffset().
+			var startFn = pinStartFn( container );
+
+			var tl = gsap.timeline( {
+				scrollTrigger: {
+					// Desktop (of geen aparte visual-kant) pint het hele blok;
+					// mobiel + split-kolommen pint alleen de tekstkolom.
+					trigger: pinTarget,
+					start: startFn,
 					end: scrollDistance,
 					pin: true,
-					pinSpacing: false,
+					// pinSpacing left at its default (true), unlike the ported
+					// theme code: that original relied on "end: 'bottom bottom'"
+					// (see scrollDistance above) so the page's own content
+					// already provided the scroll room and no spacer was
+					// needed. A fixed "+=N%" distance needs GSAP to actually
+					// reserve that much real page space — pinSpacing:false
+					// with a formula end left a blank void with nothing to
+					// scroll into (confirmed visually, not just via metrics).
 					scrub: 1,
 					anticipatePin: 1,
 					invalidateOnRefresh: true,
-					refreshPriority: 1,
-				} );
+					refreshPriority: isMobile ? 1 : 0,
+				},
+			} );
 
-				return function () {
-					gsap.set( textSide, { clearProps: 'position,zIndex' } );
-					gsap.set( imageSide, { clearProps: 'zIndex' } );
-					gsap.set( items, { clearProps: 'marginBottom' } );
-					gsap.set( contents.filter( Boolean ), { clearProps: 'height' } );
-				};
+			lockHeadingIfRequested( container, { trigger: pinTarget, start: startFn, end: scrollDistance } );
+
+			items.forEach( function ( item, i ) {
+				if ( i === items.length - 1 || ! contents[ i ] ) {
+					return;
+				}
+				tl.to( item, { marginBottom: 0, duration: 1, ease: 'none' } )
+					.to( contents[ i ], { height: 0, duration: 1, ease: 'none' }, '-=0.3' );
 			} );
 		} );
 	}
@@ -382,6 +518,7 @@
 			var speed        = num( container.getAttribute( 'data-szm-accordion-speed' ), 400 ) / 1000;
 			var allowMultiple = container.getAttribute( 'data-szm-accordion-multiple' ) === 'true';
 			var defaultOpen   = num( container.getAttribute( 'data-szm-accordion-default-open' ), -1 );
+			var ease          = gsapEase( container );
 
 			container.classList.add( 'szm-gsap-accordion--ready' );
 
@@ -442,7 +579,7 @@
 					gsap.set( panel.content, { height: 'auto' } );
 					return;
 				}
-				gsap.to( panel.content, { height: 'auto', duration: speed, ease: 'power1.out' } );
+				gsap.to( panel.content, { height: 'auto', duration: speed, ease: ease } );
 			}
 
 			function closePanel( panel ) {
@@ -453,7 +590,7 @@
 					gsap.set( panel.content, { height: 0 } );
 					return;
 				}
-				gsap.to( panel.content, { height: 0, duration: speed, ease: 'power1.in' } );
+				gsap.to( panel.content, { height: 0, duration: speed, ease: ease } );
 			}
 		} );
 	}
@@ -506,7 +643,7 @@
 					autoAlpha: 1,
 					scale: 1,
 					duration: speed,
-					ease: 'power2.out',
+					ease: gsapEase( wrapper ),
 					scrollTrigger: {
 						trigger: wrapper,
 						start: 'top 85%',
@@ -560,12 +697,14 @@
 				if ( ! video.duration || isNaN( video.duration ) ) {
 					return;
 				}
+				var startFn = pinStartFn( wrapper );
+				var endFn   = function () {
+					return '+=' + ( window.innerHeight * distanceVh );
+				};
 				window.ScrollTrigger.create( {
 					trigger: wrapper,
-					start: 'top top',
-					end: function () {
-						return '+=' + ( window.innerHeight * distanceVh );
-					},
+					start: startFn,
+					end: endFn,
 					pin: true,
 					scrub: true,
 					invalidateOnRefresh: true,
@@ -573,6 +712,19 @@
 						video.currentTime = self.progress * video.duration;
 					},
 				} );
+
+				lockHeadingIfRequested( wrapper, { trigger: wrapper, start: startFn, end: endFn } );
+
+				// This pin's spacer inserts real extra page height, but it's
+				// often created late — after "loadedmetadata" fires, which can
+				// be after ScrollTrigger's own initial page-load refresh already
+				// cached every OTHER trigger's start/end pixel positions. Any
+				// trigger further down the page (e.g. a later effect on this
+				// same page) would then stay pinned to its now-stale position,
+				// pinning far too early relative to where it actually now sits.
+				// A refresh here recomputes everyone once this pin's real height
+				// is actually in the document.
+				window.ScrollTrigger.refresh();
 			}
 
 			if ( video.readyState >= 1 ) {
@@ -588,6 +740,38 @@
 	 * core/paragraph). Splits the text with SplitText and staggers each unit
 	 * in (fade + slide-up) as it scrolls into view.
 	 */
+	var LOOP_DELAY_SECONDS = { short: 15, normal: 30, long: 60 };
+
+	function loopDelaySeconds( el ) {
+		var preset = el.getAttribute( 'data-szm-loop-delay' ) || 'normal';
+		return LOOP_DELAY_SECONDS[ preset ] || LOOP_DELAY_SECONDS.normal;
+	}
+
+	/**
+	 * "Na een tijdje herhalen" (data-szm-loop, aan by default): een losse,
+	 * pauzeerbare timeline die pas ná de eerste (scroll-getriggerde) reveal
+	 * begint en alleen loopt zolang het blok daadwerkelijk in beeld is —
+	 * anders zou een blok ver buiten beeld onnodig door blijven animeren.
+	 * IntersectionObserver i.p.v. nog een ScrollTrigger: hoeft niet mee te
+	 * doen aan pin/scrub-berekeningen, alleen zichtbaarheid.
+	 */
+	function attachVisibilityLoop( el, timeline ) {
+		if ( ! window.IntersectionObserver ) {
+			timeline.play();
+			return;
+		}
+		var observer = new window.IntersectionObserver( function ( entries ) {
+			entries.forEach( function ( entry ) {
+				if ( entry.isIntersecting ) {
+					timeline.play();
+				} else {
+					timeline.pause();
+				}
+			} );
+		}, { threshold: 0.1 } );
+		observer.observe( el );
+	}
+
 	function initTextReveal() {
 		if ( ! window.SplitText ) {
 			return;
@@ -603,6 +787,8 @@
 
 			var speed   = num( el.getAttribute( 'data-szm-text-speed' ), 600 ) / 1000;
 			var stagger = num( el.getAttribute( 'data-szm-text-stagger' ), 30 ) / 1000;
+			var ease    = gsapEase( el );
+			var loop    = el.getAttribute( 'data-szm-loop' ) !== 'false';
 
 			if ( prefersReducedMotion ) {
 				return;
@@ -617,11 +803,20 @@
 				opacity: 1,
 				duration: speed,
 				stagger: stagger,
-				ease: 'power3.out',
+				ease: ease,
 				scrollTrigger: {
 					trigger: el,
 					start: 'top 85%',
 					toggleActions: 'play none none none',
+				},
+				onComplete: function () {
+					if ( ! loop ) {
+						return;
+					}
+					var loopTl = gsap.timeline( { repeat: -1, delay: loopDelaySeconds( el ), repeatDelay: loopDelaySeconds( el ), paused: true } )
+						.to( units, { yPercent: 110, opacity: 0, duration: speed, stagger: stagger, ease: ease } )
+						.to( units, { yPercent: 0, opacity: 1, duration: speed, stagger: stagger, ease: ease } );
+					attachVisibilityLoop( el, loopTl );
 				},
 			} );
 		} );
@@ -646,29 +841,44 @@
 				return;
 			}
 
-			var before = text.slice( 0, match.index );
-			var after  = text.slice( match.index + raw.length );
-			var speed  = num( el.getAttribute( 'data-szm-counter-speed' ), 1500 ) / 1000;
+			var before   = text.slice( 0, match.index );
+			var after    = text.slice( match.index + raw.length );
+			var speed    = num( el.getAttribute( 'data-szm-counter-speed' ), 1500 ) / 1000;
 			var decimals = ( raw.split( ',' )[ 1 ] || '' ).length;
+			var ease     = gsapEase( el );
+			var loop     = el.getAttribute( 'data-szm-loop' ) !== 'false';
 
 			if ( prefersReducedMotion ) {
 				return;
 			}
 
 			var counter = { value: 0 };
+			function render() {
+				var formatted = decimals ? counter.value.toFixed( decimals ).replace( '.', ',' ) : Math.round( counter.value ).toString();
+				el.textContent = before + formatted + after;
+			}
+
 			gsap.to( counter, {
 				value: target,
 				duration: speed,
-				ease: 'power1.out',
-				onUpdate: function () {
-					var formatted = decimals ? counter.value.toFixed( decimals ).replace( '.', ',' ) : Math.round( counter.value ).toString();
-					el.textContent = before + formatted + after;
-				},
+				ease: ease,
+				onUpdate: render,
 				scrollTrigger: {
 					trigger: el,
 					start: 'top 85%',
 					toggleActions: 'play none none none',
 					once: true,
+				},
+				onComplete: function () {
+					if ( ! loop ) {
+						return;
+					}
+					// "Animeer terug naar 0" i.p.v. instant resetten: dezelfde
+					// stijl als de eerste keer, alleen dan omgekeerd.
+					var loopTl = gsap.timeline( { repeat: -1, delay: loopDelaySeconds( el ), repeatDelay: loopDelaySeconds( el ), paused: true } )
+						.to( counter, { value: 0, duration: speed, ease: ease, onUpdate: render } )
+						.to( counter, { value: target, duration: speed, ease: ease, onUpdate: render } );
+					attachVisibilityLoop( el, loopTl );
 				},
 			} );
 		} );
@@ -687,9 +897,10 @@
 		document.querySelectorAll( '.szm-gsap-magnetic' ).forEach( function ( wrapper ) {
 			var target = wrapper.querySelector( '.wp-block-button__link' ) || wrapper;
 			var strength = num( wrapper.getAttribute( 'data-szm-magnetic-strength' ), 40 );
+			var ease = gsapEase( wrapper );
 
-			var xTo = gsap.quickTo( target, 'x', { duration: 0.3, ease: 'power3' } );
-			var yTo = gsap.quickTo( target, 'y', { duration: 0.3, ease: 'power3' } );
+			var xTo = gsap.quickTo( target, 'x', { duration: 0.3, ease: ease } );
+			var yTo = gsap.quickTo( target, 'y', { duration: 0.3, ease: ease } );
 
 			wrapper.addEventListener( 'mousemove', function ( e ) {
 				var rect = wrapper.getBoundingClientRect();
@@ -737,6 +948,62 @@
 
 			container.classList.add( 'szm-gsap-horizontal--ready' );
 
+			var mode    = container.getAttribute( 'data-szm-horizontal-mode' ) === 'stack' ? 'stack' : 'scroll';
+			var startFn = pinStartFn( container );
+
+			// "Stapelen": geen zijwaartse beweging — panelen liggen absoluut op
+			// elkaar (zelfde techniek als de fullpage-stack-overgang hieronder)
+			// en het volgende dekt het vorige af naarmate er verticaal gescrold
+			// wordt. Container krijgt de hoogte van het hoogste paneel, gemeten
+			// vóór het absoluut positioneren — anders zakt hij in elkaar, want
+			// absolute kinderen geven geen hoogte door aan hun ouder.
+			if ( mode === 'stack' ) {
+				var maxHeight = 0;
+				children.forEach( function ( child ) {
+					maxHeight = Math.max( maxHeight, child.getBoundingClientRect().height );
+				} );
+
+				container.style.position = 'relative';
+				container.style.height   = maxHeight + 'px';
+
+				children.forEach( function ( child, i ) {
+					child.classList.add( 'szm-gsap-horizontal-panel', 'szm-gsap-horizontal-panel--stacked' );
+					gsap.set( child, {
+						position: 'absolute',
+						top: 0,
+						left: 0,
+						width: '100%',
+						height: '100%',
+						zIndex: i,
+						opacity: 1,
+						yPercent: i === 0 ? 0 : 100,
+					} );
+				} );
+
+				var stackEnd = '+=' + ( children.length - 1 ) * 100 + '%';
+				var stackTl = gsap.timeline( {
+					scrollTrigger: {
+						trigger: container,
+						start: startFn,
+						end: stackEnd,
+						scrub: true,
+						pin: true,
+						invalidateOnRefresh: true,
+					},
+				} );
+
+				children.forEach( function ( panel, i ) {
+					if ( i === children.length - 1 ) {
+						return;
+					}
+					stackTl.to( panel, { scale: 0.92, opacity: 0.6, duration: 1, ease: 'none' }, i )
+						.to( children[ i + 1 ], { yPercent: 0, duration: 1, ease: 'none' }, i );
+				} );
+
+				lockHeadingIfRequested( container, { trigger: container, start: startFn, end: stackEnd } );
+				return;
+			}
+
 			var track = document.createElement( 'div' );
 			track.className = 'szm-gsap-horizontal-track';
 			children.forEach( function ( child ) {
@@ -748,6 +1015,9 @@
 			var scrollDistance = function () {
 				return track.scrollWidth - container.clientWidth;
 			};
+			var horizontalEnd = function () {
+				return '+=' + scrollDistance();
+			};
 
 			gsap.to( track, {
 				x: function () {
@@ -756,15 +1026,15 @@
 				ease: 'none',
 				scrollTrigger: {
 					trigger: container,
-					start: 'top top',
-					end: function () {
-						return '+=' + scrollDistance();
-					},
+					start: startFn,
+					end: horizontalEnd,
 					scrub: true,
 					pin: true,
 					invalidateOnRefresh: true,
 				},
 			} );
+
+			lockHeadingIfRequested( container, { trigger: container, start: startFn, end: horizontalEnd } );
 		} );
 	}
 
@@ -775,11 +1045,11 @@
 	 */
 	function initMarquee() {
 		document.querySelectorAll( '.szm-gsap-marquee' ).forEach( function ( list ) {
-			var items = Array.prototype.slice.call( list.children ).filter( function ( child ) {
+			var originalItems = Array.prototype.slice.call( list.children ).filter( function ( child ) {
 				return child.nodeType === 1;
 			} );
 
-			if ( ! items.length ) {
+			if ( ! originalItems.length ) {
 				return;
 			}
 
@@ -788,22 +1058,82 @@
 
 			list.classList.add( 'szm-gsap-marquee--ready' );
 
-			// Duplicate the item set once so the track can wrap seamlessly.
-			items.forEach( function ( item ) {
-				list.appendChild( item.cloneNode( true ) );
+			var tween    = null;
+			var setWidth = 0;
+
+			function clearClones() {
+				Array.prototype.slice.call( list.children ).forEach( function ( child ) {
+					if ( originalItems.indexOf( child ) === -1 ) {
+						list.removeChild( child );
+					}
+				} );
+			}
+
+			// (Her)bouwt de track: meet de echte breedte van één set (incl. gap),
+			// dupliceert daarna zo vaak als nodig tot er minimaal 2 viewport-
+			// breedtes + 1 extra set aan content staat. Met maar 1 duplicaat
+			// (de oude aanpak) was er een zichtbaar gat/sprong zodra één set
+			// smaller was dan het scherm, of zodra een laat ladende afbeelding
+			// de breedte alsnog veranderde — vandaar ook de resize/load-hooks
+			// hieronder die dit opnieuw aanroepen.
+			function buildTrack() {
+				if ( tween ) {
+					tween.kill();
+					tween = null;
+				}
+				clearClones();
+
+				originalItems.forEach( function ( item ) {
+					list.appendChild( item.cloneNode( true ) );
+				} );
+				var firstOriginal = originalItems[ 0 ];
+				var firstClone    = list.children[ originalItems.length ];
+				setWidth = firstClone.getBoundingClientRect().left - firstOriginal.getBoundingClientRect().left;
+				if ( ! setWidth || setWidth <= 0 ) {
+					setWidth = list.scrollWidth / 2;
+				}
+
+				var viewportWidth = list.parentElement ? list.parentElement.clientWidth : window.innerWidth;
+				var minWidth      = viewportWidth * 2 + setWidth;
+				var guard         = 0;
+				while ( list.scrollWidth < minWidth && guard < 20 ) {
+					originalItems.forEach( function ( item ) {
+						list.appendChild( item.cloneNode( true ) );
+					} );
+					guard++;
+				}
+
+				if ( prefersReducedMotion ) {
+					return;
+				}
+
+				gsap.set( list, { x: direction === -1 ? 0 : -setWidth } );
+				tween = gsap.to( list, {
+					x: direction === -1 ? -setWidth : 0,
+					duration: speedSeconds,
+					ease: 'none',
+					repeat: -1,
+				} );
+			}
+
+			buildTrack();
+
+			var images = list.querySelectorAll( 'img' );
+			images.forEach( function ( img ) {
+				if ( ! img.complete ) {
+					img.addEventListener( 'load', buildTrack, { once: true } );
+				}
+			} );
+
+			var resizeTimer = null;
+			window.addEventListener( 'resize', function () {
+				window.clearTimeout( resizeTimer );
+				resizeTimer = window.setTimeout( buildTrack, 200 );
 			} );
 
 			if ( prefersReducedMotion ) {
 				return;
 			}
-
-			var totalWidth = list.scrollWidth / 2;
-			var tween = gsap.fromTo( list, { x: direction === -1 ? 0 : -totalWidth }, {
-				x: direction === -1 ? -totalWidth : 0,
-				duration: speedSeconds,
-				ease: 'none',
-				repeat: -1,
-			} );
 
 			// Pause on hover so visitors can actually read a fast-moving marquee.
 			// Alleen bij echte hover: op touch-devices kan scrollen óver de marquee
@@ -812,10 +1142,14 @@
 			// leek dan alsof "hij niet werkt". Zie supportsHover hierboven.
 			if ( supportsHover ) {
 				list.addEventListener( 'mouseenter', function () {
-					tween.pause();
+					if ( tween ) {
+						tween.pause();
+					}
 				} );
 				list.addEventListener( 'mouseleave', function () {
-					tween.resume();
+					if ( tween ) {
+						tween.resume();
+					}
 				} );
 			} else {
 				// Touch-alternatief: hoveren bestaat niet, dus een tik zet
@@ -829,7 +1163,7 @@
 					touchStart = { x: t.clientX, y: t.clientY, time: Date.now() };
 				}, { passive: true } );
 				list.addEventListener( 'touchend', function ( e ) {
-					if ( ! touchStart ) {
+					if ( ! touchStart || ! tween ) {
 						return;
 					}
 					var t = e.changedTouches[ 0 ];
@@ -866,16 +1200,42 @@
 			}
 
 			container.classList.add( 'szm-gsap-fullpage--ready' );
+
+			// Overgangsstijl (dropdown): fade (oud gedrag, default), stack,
+			// slideup of zoom. z-index loopt nu altijd oplopend met i (later
+			// paneel bovenop) — bij fade maakt de volgorde niets uit (volledig
+			// opaak/transparant), maar stack/slideup/zoom hebben het latere
+			// paneel wél zichtbaar boven het vorige nodig om af te dekken.
+			var transition = container.getAttribute( 'data-szm-fullpage-transition' ) || 'fade';
+
 			panels.forEach( function ( panel, i ) {
 				panel.classList.add( 'szm-gsap-fullpage-panel' );
-				gsap.set( panel, { opacity: i === 0 ? 1 : 0, zIndex: panels.length - i } );
+				var state = { zIndex: i };
+				if ( transition === 'fade' ) {
+					state.opacity = i === 0 ? 1 : 0;
+				} else if ( transition === 'zoom' ) {
+					state.opacity = i === 0 ? 1 : 0;
+					state.scale   = i === 0 ? 1 : 1.15;
+				} else {
+					// slideup / stack: altijd zichtbaar, alleen y-positie verschilt.
+					state.opacity  = 1;
+					state.yPercent = i === 0 ? 0 : 100;
+				}
+				gsap.set( panel, state );
 			} );
+
+			var startFn = topPinStartFn();
+			var endValue = '+=' + ( panels.length - 1 ) * 100 + '%';
 
 			var tl = gsap.timeline( {
 				scrollTrigger: {
 					trigger: container,
-					start: 'top top',
-					end: '+=' + ( panels.length - 1 ) * 100 + '%',
+					// Geen gebruikers-preset (altijd top): elk panel moet het hele
+					// scherm vullen, dus pinnen kan alleen exact bovenaan beginnen.
+					// topPinStartFn() corrigeert nog wel automatisch voor een sticky
+					// header/adminbalk, zie getFixedHeaderOffset().
+					start: startFn,
+					end: endValue,
 					scrub: true,
 					pin: true,
 					invalidateOnRefresh: true,
@@ -886,9 +1246,23 @@
 				if ( i === panels.length - 1 ) {
 					return;
 				}
-				tl.to( panel, { opacity: 0, duration: 1 }, i )
-					.to( panels[ i + 1 ], { opacity: 1, duration: 1 }, i );
+				var next = panels[ i + 1 ];
+				if ( transition === 'fade' ) {
+					tl.to( panel, { opacity: 0, duration: 1, ease: 'none' }, i )
+						.to( next, { opacity: 1, duration: 1, ease: 'none' }, i );
+				} else if ( transition === 'zoom' ) {
+					tl.to( panel, { opacity: 0, scale: 0.9, duration: 1, ease: 'none' }, i )
+						.to( next, { opacity: 1, scale: 1, duration: 1, ease: 'none' }, i );
+				} else if ( transition === 'stack' ) {
+					tl.to( panel, { scale: 0.92, opacity: 0.6, duration: 1, ease: 'none' }, i )
+						.to( next, { yPercent: 0, duration: 1, ease: 'none' }, i );
+				} else {
+					// slideup
+					tl.to( next, { yPercent: 0, duration: 1, ease: 'none' }, i );
+				}
 			} );
+
+			lockHeadingIfRequested( container, { trigger: container, start: startFn, end: endValue } );
 		} );
 	}
 
@@ -903,6 +1277,23 @@
 		initCounters();
 		initMagneticButtons();
 		initMarquee();
+
+		// Every init*Above creates its ScrollTrigger pins/positions as soon as
+		// it runs — but a pin earlier in *this list* can sit later in the
+		// *document* than one created after it (e.g. initProcessSteps() runs
+		// before initHorizontalScroll()/initFullpage(), yet a process section
+		// can come after a horizontal/fullpage section on the page). Each
+		// earlier-in-the-DOM pin inserts real extra page height once it's
+		// created; anything whose position was measured before that already
+		// happened ends up stale by that much, pinning far too early. One
+		// refresh here, once every synchronous effect above has run, forces
+		// GSAP to recompute every trigger's start/end against the final,
+		// fully-settled layout. (Async pins — currently just video-scrub,
+		// which waits on the video's "loadedmetadata" — need their own
+		// follow-up refresh after they actually get created; see there.)
+		if ( window.ScrollTrigger ) {
+			window.ScrollTrigger.refresh();
+		}
 
 		// Mobiel: adresbalk in/uit beeld en rotatie veranderen de viewporthoogte
 		// zonder dat de content zelf verandert — ScrollTrigger moet dan opnieuw
