@@ -302,3 +302,12 @@ als `frontend.js` niet laadt); Marquee+Entrance-combinatie niet live getest.
 - **Welke:** tekst-reveal (chars/words/lines), counter, video "Inzoomen bij in beeld komen". Niet: scroll-gekoppelde effecten (parallax, scrub, pin, proces, horizontal, fullpage), play-on-scroll, marquee, magnetic, slider, accordion.
 - **Werking:** `entranceReplay(el, tween, {loop, onReset})` in `gsap-effects.js`: ScrollTrigger `onEnter`/`onEnterBack` speelt af, IntersectionObserver met `rootMargin: '100% 0px 100% 0px'` zet terug (`pause(0)`), een tweede IO pauzeert de "Na een tijdje herhalen"-loop buiten beeld. Vervangt `attachVisibilityLoop`. Weg: `once: true` (counter) en `toggleActions ... reverse` (video-reveal speelde terug bij omhoog scrollen).
 - **Geverifieerd:** Playwright wheel-scroll op `/szm-previews/` (tekst, counter) en `szm-gsap-demo-2` (video): binnen 100vh blijft staan, >100vh onder/boven zet terug, terugkomen van beide kanten speelt opnieuw af, 0 pageerrors.
+
+## v1.14.0 — GSAP-entrances naar het Entrance-paneel (2026-09-25)
+
+- **Vraag gebruiker:** "horen die gsap entrence animaties niet eigenlijk onder entreance animaties ipv gsap animities?" Akkoord met: indelen op trigger (hover / in beeld komen / scroll & interactie) i.p.v. op library.
+- **Entrance-dropdown per bloktype:** CSS-entrances + `Tekst: per letter/woord/regel` (kop, alinea) + `Video: inzoomen bij in beeld komen` (video, cover). Counter = schakelaar in hetzelfde paneel (mag samen met tekst-reveal). Herhaal-opties staan eronder.
+- **Eén keuze per blok:** kiezen zet de andere entrance-attributes leeg. Bestond al een blok met CSS-entrance én tekst/video-reveal, dan toont de dropdown tekst/video (er stond er op fse-test geen).
+- **Opslag ongewijzigd** (`szmGsapText`, `szmGsapVideoEffect`, `szmEntranceAnimation`): alleen de UI verhuist, dus geen validatierisico. Dropdown-waarden `text-<x>` / `video-reveal` bestaan alleen in de UI en zijn ook de preview-GIF-sleutels.
+- **GSAP-paneel heet nu "Scroll & interactie"** (slider, proces, accordion, horizontal, fullpage, parallax, scrub, play-on-scroll, marquee, magnetic). Regel voor nieuwe effecten: indelen op trigger, niet op techniek.
+- **Geverifieerd:** editor-check 680/201/676 0 ongeldig; wisselen in de dropdown zet de juiste attributes (Playwright); video-dropdown in Scroll & interactie zonder reveal. Post 199 (`szm-gsap-demo`, oude pagina) heeft 4 ongeldige blokken, ook al op v1.11.1 en v1.13.0: bestond al, niet door deze wijziging.
