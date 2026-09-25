@@ -31,5 +31,12 @@ return [
       c('core/heading', { level: 3, content: 'Stap ' + n }),
       c('core/paragraph', { content: 'Uitleg bij stap ' + n + ' die inklapt tijdens scrollen.' }),
     ])))]),
+  c('core/group', { layout: { type: 'constrained', contentSize: '640px' } }, [spacer('45vh'),
+    c('core/columns', { anchor: 'prev-columns-slider', szmGsapEffect: 'slider', szmGsapSliderAutoplay: false }, [['pale-cyan-blue', 'Slide 1'], ['pale-pink', 'Slide 2'], ['light-green-cyan', 'Slide 3']].map(([kleur, t]) =>
+      c('core/column', { backgroundColor: kleur, style: { spacing: { padding: { top: '48px', right: '32px', bottom: '48px', left: '32px' } } } }, [
+        c('core/heading', { level: 3, content: t }),
+        c('core/paragraph', { content: 'Kolommen worden slides.' }),
+      ]))),
+    spacer('45vh')]),
   spacer('100vh'),
 ];
