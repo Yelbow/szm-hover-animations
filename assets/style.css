@@ -462,3 +462,14 @@
 	overflow: visible !important;
 	transform: none !important;
 }
+
+/* Editor: preview-GIF onder een effect-keuze in de Inspector. */
+.szm-ha-preview {
+	display: block;
+	width: 100%;
+	height: auto;
+	margin: -8px 0 16px;
+	border: 1px solid #ddd;
+	border-radius: 2px;
+	background: #fff;
+}

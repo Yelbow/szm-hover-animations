@@ -19,6 +19,9 @@
 	var HOVER_BLOCKS       = settings.blocks || [];
 	var ENTRANCE_BLOCKS    = settings.entranceBlocks || [];
 	var HOVER_OPTIONS_MAP  = settings.options || {};
+	// Preview-GIF's (assets/previews/<sleutel>.gif), alleen de sleutels die bestaan.
+	var PREVIEWS    = settings.previews || [];
+	var PREVIEW_URL = settings.previewUrl || '';
 	var ENTRANCE_OPTIONS_MAP = settings.entranceOptions || {};
 
 	// GSAP-module: geen nieuwe blokken, gedrag toegevoegd aan bestaande blokken.
@@ -135,6 +138,25 @@
 	function mapToOptions( map ) {
 		return Object.keys( map ).map( function ( value ) {
 			return { value: value, label: map[ value ] };
+		} );
+	}
+
+	/**
+	 * Klein voorbeeld-GIF-je onder een effect-keuze, zodat je ziet wat het effect
+	 * doet voordat je naar de front-end gaat. Sleutel = '<as>-<waarde>' (bv.
+	 * 'hover-lift', 'entrance-reveal') of alleen de toggle-naam ('counter').
+	 * Geen bestand = niets tonen.
+	 */
+	function previewFor( key ) {
+		if ( ! key || PREVIEWS.indexOf( key ) === -1 ) {
+			return null;
+		}
+		return el( 'img', {
+			key: 'szm-preview-' + key,
+			className: 'szm-ha-preview',
+			src: PREVIEW_URL + key + '.gif',
+			alt: '',
+			loading: 'lazy',
 		} );
 	}
 
@@ -504,6 +526,7 @@
 								setAttributes( { szmHoverAnimation: value } );
 							},
 						} ),
+						previewFor( attributes.szmHoverAnimation && 'hover-' + attributes.szmHoverAnimation ),
 						!! attributes.szmHoverAnimation && el( RangeControl, {
 							label: __( 'Snelheid (ms)', 'szm-hover-animations' ),
 							value: attributes.szmHoverSpeed || DEFAULT_HOVER_SPEED,
@@ -548,6 +571,7 @@
 								setAttributes( next );
 							},
 						} ),
+						previewFor( attributes.szmEntranceAnimation && 'entrance-' + attributes.szmEntranceAnimation ),
 						ENTRANCE_DISTANCE_DEFAULTS.hasOwnProperty( attributes.szmEntranceAnimation ) && el( RangeControl, {
 							label: __( 'Schuifafstand (px)', 'szm-hover-animations' ),
 							value: typeof attributes.szmEntranceDistance === 'number' ? attributes.szmEntranceDistance : ENTRANCE_DISTANCE_DEFAULTS[ attributes.szmEntranceAnimation ],
@@ -599,6 +623,7 @@
 							options: mapToOptions( GSAP_COLUMNS_OPTIONS_MAP ),
 							onChange: handleColumnsEffectChange,
 						} ),
+						showColumnsFamily && previewFor( columnsEffect && 'columns-' + columnsEffect ),
 						showColumnsFamily && columnsEffect === 'slider' && el( RangeControl, {
 							label: __( 'Overgangssnelheid (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapSliderSpeed || DEFAULT_SLIDER_SPEED,
@@ -648,6 +673,7 @@
 							options: mapToOptions( GSAP_GROUP_OPTIONS_MAP ),
 							onChange: handleGroupEffectChange,
 						} ),
+						showGroupFamily && previewFor( groupEffect && 'group-' + groupEffect ),
 						showGroupFamily && groupEffect === 'accordion' && el( RangeControl, {
 							label: __( 'Snelheid (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapAccordionSpeed || DEFAULT_ACCORDION_SPEED,
@@ -717,6 +743,7 @@
 								setAttributes( { szmGsapVideoEffect: value } );
 							},
 						} ),
+						showGsapVideo && previewFor( attributes.szmGsapVideoEffect && 'video-' + attributes.szmGsapVideoEffect ),
 						showGsapVideo && attributes.szmGsapVideoEffect === 'parallax' && el( RangeControl, {
 							label: __( 'Parallax-intensiteit (%)', 'szm-hover-animations' ),
 							value: attributes.szmGsapVideoSpeed || DEFAULT_VIDEO_SPEED,
@@ -762,6 +789,7 @@
 							},
 							help: __( 'Splitst de tekst met SplitText en onthult per letter/woord/regel bij scrollen in beeld. Niet live zichtbaar in de editor.', 'szm-hover-animations' ),
 						} ),
+						showGsapText && previewFor( attributes.szmGsapText && 'text-' + attributes.szmGsapText ),
 						showGsapText && !! attributes.szmGsapText && el( RangeControl, {
 							label: __( 'Snelheid per eenheid (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapTextSpeed || DEFAULT_TEXT_SPEED,
@@ -814,6 +842,7 @@
 								setAttributes( { szmGsapCounter: value } );
 							},
 						} ),
+						!! attributes.szmGsapCounter && previewFor( 'counter' ),
 						showGsapCounter && !! attributes.szmGsapCounter && el( RangeControl, {
 							label: __( 'Duur (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapCounterSpeed || DEFAULT_COUNTER_SPEED,
@@ -834,6 +863,7 @@
 								setAttributes( { szmGsapMagnetic: value } );
 							},
 						} ),
+						!! attributes.szmGsapMagnetic && previewFor( 'magnetic' ),
 						showGsapMagnetic && !! attributes.szmGsapMagnetic && el( RangeControl, {
 							label: __( 'Trekkracht (px)', 'szm-hover-animations' ),
 							value: attributes.szmGsapMagneticStrength || DEFAULT_MAGNETIC_STRENGTH,
@@ -855,6 +885,7 @@
 								setAttributes( { szmGsapMarquee: value } );
 							},
 						} ),
+						!! attributes.szmGsapMarquee && previewFor( 'marquee' ),
 						showGsapMarquee && !! attributes.szmGsapMarquee && el( SelectControl, {
 							label: __( 'Richting', 'szm-hover-animations' ),
 							value: attributes.szmGsapMarqueeDirection || 'left',
