@@ -64,6 +64,10 @@ User's own words, verbatim, from the 2026-09-13/14 session. Not paraphrased or i
 
 > voor /animatie-volledige-flow zou ik graag willen dat we goedkoop een gifje kunnen maken van de antimaties die we pullen zodat we die in de plugin in de site editor na de selectie van elk effect kunnen laten zien.
 
+Keuzes in de vragenronde: "Wat moet de GIF laten zien?" → "Origineel van concurrent"; "Alleen voor nieuw gepullde effecten, of ook de bestaande effecten in de plugin met terugwerkende kracht?" → "Ook bestaande (Aanbevolen)".
+
+> ziet er goed uit, ga verder met de backfill
+
 > voor entrance animaties hadden we een regel gemaakt dat die moet herhalen bij bepaalde critieria kun je dat terug vinden. dat moet uiteraard ook op GSAP entrence achtige animaties snap je dat?
 
 > ja klopt dat wil ik gebouwd. vervolgvraag horen die gsap entrence animaties niet eigenlijk onder entreance animaties ipv gsap animities? dat is mee reen architecture vraag
