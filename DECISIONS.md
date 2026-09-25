@@ -245,3 +245,33 @@ firing immediately, and settles correctly at final values.
   real sticky header, non-default pin-start/easing presets, mobile
   re-check, studiozondermeer.nl homepage) remains open — nothing this
   session touched those.
+
+## 2026-09-25 — v1.11.0: "Fade-in reveal" entrance-variant (nixowebbuilding.nl 04A)
+
+Eerste pilot van de workflow concurrent-analyse → plugin (analyse in
+`~/Projects/SZM/docs/research/animaties/nixowebbuilding/04-reveals/`).
+
+**Eigen variant, niet de bestaande slide-up aangepast.** Mechanisch is het
+hetzelfde als `slide-up` (IntersectionObserver + CSS-transitie), maar de
+gebruiker vond het "uniek genoeg om zijn eigen variatie te bezitten". Verschil:
+24px i.p.v. 32px, 400ms i.p.v. 800ms (gezet bij kiezen in de dropdown, alleen
+als de snelheid nog op de standaard stond), en een vroegere trigger (threshold
+0.1 / rootMargin −50px, eigen observer in `frontend.js`).
+
+**Schuifafstand-attribute zonder default.** `szmEntranceDistance` heeft geen
+default; alleen als de gebruiker de slider aanraakt wordt
+`--szm-entrance-distance` opgeslagen. Zo krijgen al gepubliceerde slide-up-blokken
+geen nieuwe style-var en dus geen block-recovery (zie v1.9.0-notitie). De CSS-
+fallbacks (32/24px) en `ENTRANCE_DISTANCE_DEFAULTS` in `editor.js` moeten gelijk
+blijven. Geverifieerd: post 201 na deploy 104 blokken, 0 ongeldig.
+
+**Entrance op 20 core-bloktypes** (was 4), gebruiker: "zo veel mogelijk wat
+daadwerkelijk logisch is". Wel: tekst, lijst, citaat, media, knoppen, tabel,
+details, scheidingslijn, social links. Niet: spacer, navigatie, template-parts.
+Conflictcheck met GSAP: alleen Marquee zet `x` op het blok zelf (de `<ul>`) —
+daar valt Entrance terug op alleen fade (`.szm-gsap-marquee.szm-entrance`).
+Video- en magnetic-effecten animeren een kind-element, geen conflict. Stagger-
+slider alleen op blokken die kinderen kunnen hebben (`ENTRANCE_STAGGER_BLOCKS`).
+
+**Niet gedaan:** nixo's `html.js`-vangnet (nu blijft entrance-content onzichtbaar
+als `frontend.js` niet laadt); Marquee+Entrance-combinatie niet live getest.
