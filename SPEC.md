@@ -59,3 +59,13 @@ User's own words, verbatim, from the 2026-09-13/14 session. Not paraphrased or i
 > even alle animaties zijn chill maar nog een groot ding op het moment is dat entrence en hover animaties en gsap Zeg maar alle animaties. Soms is er... Een blok of groep ofzo. Waarbij je eigenlijk wil dat gewoon alle children... Ik denk vooral alle directe kinderen daarvan. Die animatie vertonen. En dat je dan niet in hoeft te stellen... Elk individueel item. [...] Ja, het chillste is dat je op één plek Animatie aanzet. En dat dan gewoon duidelijk is... Waar de animaties op moet komen. En... En dat de stagger goed werkt, zeg maar.
 
 > Ja, op zich goed. Dan heb je nog één risico en dat is bijvoorbeeld, ik heb een groep met daarin. Of een titel of een header, zeg maar. Zeg maar. Daarna kolommen. [...] Terwijl je eigenlijk wel wil... Dat als je het op de groep, de bovenste groep doet... dat de individuele kolommen wel een... voor een verschijnen. Snap je? Dus misschien moet die grids en kolommen negeren ofzo...
+
+## 2026-09-25
+
+> voor /animatie-volledige-flow zou ik graag willen dat we goedkoop een gifje kunnen maken van de antimaties die we pullen zodat we die in de plugin in de site editor na de selectie van elk effect kunnen laten zien.
+
+> voor entrance animaties hadden we een regel gemaakt dat die moet herhalen bij bepaalde critieria kun je dat terug vinden. dat moet uiteraard ook op GSAP entrence achtige animaties snap je dat?
+
+> ja klopt dat wil ik gebouwd. vervolgvraag horen die gsap entrence animaties niet eigenlijk onder entreance animaties ipv gsap animities? dat is mee reen architecture vraag
+
+> ben het met alles eens alleen entrence en tekst-reveal conflict snap ik niet

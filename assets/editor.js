@@ -463,8 +463,27 @@
 			var showGsapCounter = isGsapCounterSupported( name );
 			var showGsapMagnetic = isGsapMagneticSupported( name );
 			var showGsapMarquee = isGsapMarqueeSupported( name );
-			var showGsapBox = showColumnsFamily || showGroupFamily || showGsapVideo || showGsapText ||
-				showGsapCounter || showGsapMagnetic || showGsapMarquee;
+			// Tekst-reveal en counter staan sinds v1.14.0 in het Entrance-paneel.
+			var showGsapBox = showColumnsFamily || showGroupFamily || showGsapVideo ||
+				showGsapMagnetic || showGsapMarquee;
+
+			// Entrance-dropdown: CSS-entrances + (per bloktype) de GSAP-entrances.
+			// Opslag blijft in de eigen attributes (szmGsapText, szmGsapVideoEffect),
+			// dus bestaande blokken blijven geldig. Bij beide aan wint tekst/video.
+			var entranceOptions = mapToOptions( ENTRANCE_OPTIONS_MAP );
+			if ( showGsapText ) {
+				Object.keys( GSAP_TEXT_OPTIONS_MAP ).forEach( function ( k ) {
+					if ( k ) {
+						entranceOptions.push( { value: 'text-' + k, label: __( 'Tekst: ', 'szm-hover-animations' ) + GSAP_TEXT_OPTIONS_MAP[ k ].toLowerCase() } );
+					}
+				} );
+			}
+			if ( showGsapVideo && GSAP_VIDEO_OPTIONS_MAP.reveal ) {
+				entranceOptions.push( { value: 'video-reveal', label: __( 'Video: ', 'szm-hover-animations' ) + GSAP_VIDEO_OPTIONS_MAP.reveal.toLowerCase() } );
+			}
+			var entranceValue = ( showGsapText && attributes.szmGsapText ) ? 'text-' + attributes.szmGsapText :
+				( showGsapVideo && attributes.szmGsapVideoEffect === 'reveal' ) ? 'video-reveal' :
+				( attributes.szmEntranceAnimation || '' );
 
 			// Bereken automatisch hoeveel vertraging dit blok moet krijgen: zijn
 			// index tussen de directe siblings van dezelfde parent, vermenigvuldigd
@@ -722,10 +741,29 @@
 						{ title: __( 'Entrance animatie', 'szm-hover-animations' ), initialOpen: false },
 						el( SelectControl, {
 							label: __( 'Animatie bij in beeld scrollen', 'szm-hover-animations' ),
-							value: attributes.szmEntranceAnimation || '',
-							options: mapToOptions( ENTRANCE_OPTIONS_MAP ),
+							value: entranceValue,
+							options: entranceOptions,
 							onChange: function ( value ) {
 								var next = { szmEntranceAnimation: value };
+								// Eén keuze per blok: de andere entrance-soorten uit.
+								if ( showGsapText ) {
+									next.szmGsapText = '';
+								}
+								if ( showGsapVideo && attributes.szmGsapVideoEffect === 'reveal' ) {
+									next.szmGsapVideoEffect = '';
+								}
+								if ( value.indexOf( 'text-' ) === 0 ) {
+									next.szmEntranceAnimation = '';
+									next.szmGsapText = value.slice( 5 );
+									setAttributes( next );
+									return;
+								}
+								if ( value === 'video-reveal' ) {
+									next.szmEntranceAnimation = '';
+									next.szmGsapVideoEffect = 'reveal';
+									setAttributes( next );
+									return;
+								}
 								// Reveal is kort: neem de 400ms over zolang de snelheid
 								// nog op de standaard staat (eigen keuze blijft staan).
 								if ( value === 'reveal' && ( ! attributes.szmEntranceSpeed || attributes.szmEntranceSpeed === DEFAULT_ENTRANCE_SPEED ) ) {
@@ -734,7 +772,7 @@
 								setAttributes( next );
 							},
 						} ),
-						previewFor( attributes.szmEntranceAnimation && 'entrance-' + attributes.szmEntranceAnimation ),
+						previewFor( entranceValue && ( /^(text|video)-/.test( entranceValue ) ? entranceValue : 'entrance-' + entranceValue ) ),
 						!! attributes.szmEntranceAnimation && ENTRANCE_STAGGER_BLOCKS.indexOf( name ) !== -1 && el( SelectControl, {
 							label: __( 'Toepassen op', 'szm-hover-animations' ),
 							help: entranceTarget === 'children' ?
@@ -791,11 +829,88 @@
 							min: 0,
 							max: 500,
 							step: 25,
+						} ),
+
+						// GSAP-entrances (v1.14.0 hierheen verhuisd uit het GSAP-paneel):
+						// video-reveal en tekst-reveal (SplitText).
+						showGsapVideo && attributes.szmGsapVideoEffect === 'reveal' && el( RangeControl, {
+							label: __( 'Snelheid (ms)', 'szm-hover-animations' ),
+							value: attributes.szmGsapVideoSpeed || 800,
+							onChange: function ( value ) {
+								setAttributes( { szmGsapVideoSpeed: value } );
+							},
+							min: 200,
+							max: 2000,
+							step: 100,
+						} ),
+						showGsapVideo && attributes.szmGsapVideoEffect === 'reveal' && easingControl(),
+						showGsapText && !! attributes.szmGsapText && el( RangeControl, {
+							label: __( 'Snelheid per eenheid (ms)', 'szm-hover-animations' ),
+							value: attributes.szmGsapTextSpeed || DEFAULT_TEXT_SPEED,
+							onChange: function ( value ) {
+								setAttributes( { szmGsapTextSpeed: value } );
+							},
+							min: 200,
+							max: 1500,
+							step: 50,
+						} ),
+						showGsapText && !! attributes.szmGsapText && el( RangeControl, {
+							label: __( 'Stagger tussen eenheden (ms)', 'szm-hover-animations' ),
+							value: attributes.szmGsapTextStagger || DEFAULT_TEXT_STAGGER,
+							onChange: function ( value ) {
+								setAttributes( { szmGsapTextStagger: value } );
+							},
+							min: 0,
+							max: 150,
+							step: 5,
+						} ),
+						showGsapText && !! attributes.szmGsapText && easingControl(),
+
+						// core/heading: animated counter — bewust los van tekst-reveal
+						// hierboven (kan op dezelfde Heading tegelijk aan staan, bv. een
+						// "500+ klanten"-cijfer dat zowel telt als per letter onthult).
+						showGsapCounter && el( ToggleControl, {
+							label: __( 'Getal optellen bij in beeld scrollen', 'szm-hover-animations' ),
+							help: __( 'Herkent het eerste getal in de tekst van deze Heading en telt het op van 0 naar dat getal. Voeg zelf een € of % toe in de tekst; die blijft staan. Niet live zichtbaar in de editor.', 'szm-hover-animations' ),
+							checked: !! attributes.szmGsapCounter,
+							onChange: function ( value ) {
+								setAttributes( { szmGsapCounter: value } );
+							},
+						} ),
+						!! attributes.szmGsapCounter && previewFor( 'counter' ),
+						showGsapCounter && !! attributes.szmGsapCounter && el( RangeControl, {
+							label: __( 'Duur (ms)', 'szm-hover-animations' ),
+							value: attributes.szmGsapCounterSpeed || DEFAULT_COUNTER_SPEED,
+							onChange: function ( value ) {
+								setAttributes( { szmGsapCounterSpeed: value } );
+							},
+							min: 300,
+							max: 4000,
+							step: 100,
+						} ),
+
+						// Herhalen: één instelling voor tekst-reveal + counter samen (kan
+						// allebei tegelijk op dezelfde Heading staan), aan by default.
+						( ( showGsapText && !! attributes.szmGsapText ) || ( showGsapCounter && !! attributes.szmGsapCounter ) ) && el( ToggleControl, {
+							label: __( 'Na een tijdje herhalen (verdwijnen + opnieuw afspelen)', 'szm-hover-animations' ),
+							help: __( 'Zolang dit blok in beeld blijft, speelt de animatie na de ingestelde wachttijd steeds opnieuw af, in dezelfde stijl als de eerste keer.', 'szm-hover-animations' ),
+							checked: attributes.szmGsapLoop !== false,
+							onChange: function ( value ) {
+								setAttributes( { szmGsapLoop: value } );
+							},
+						} ),
+						( ( showGsapText && !! attributes.szmGsapText ) || ( showGsapCounter && !! attributes.szmGsapCounter ) ) && attributes.szmGsapLoop !== false && el( SelectControl, {
+							label: __( 'Wachttijd voor herhalen', 'szm-hover-animations' ),
+							value: attributes.szmGsapLoopDelay || DEFAULT_LOOP_DELAY,
+							options: mapToOptions( LOOP_DELAY_OPTIONS_MAP ),
+							onChange: function ( value ) {
+								setAttributes( { szmGsapLoopDelay: value } );
+							},
 						} )
 					),
 					showGsapBox && el(
 						PanelBody,
-						{ title: __( 'GSAP effect', 'szm-hover-animations' ), initialOpen: false },
+						{ title: __( 'Scroll & interactie', 'szm-hover-animations' ), initialOpen: false },
 
 						// core/columns: slider of sticky proces-stappen.
 						showColumnsFamily && el( SelectControl, {
@@ -918,13 +1033,16 @@
 						// core/video, core/cover.
 						showGsapVideo && el( SelectControl, {
 							label: __( 'Video-effect', 'szm-hover-animations' ),
-							value: attributes.szmGsapVideoEffect || '',
-							options: mapToOptions( GSAP_VIDEO_OPTIONS_MAP ),
+							// "reveal" staat in de Entrance-dropdown (v1.14.0).
+							value: attributes.szmGsapVideoEffect === 'reveal' ? '' : ( attributes.szmGsapVideoEffect || '' ),
+							options: mapToOptions( GSAP_VIDEO_OPTIONS_MAP ).filter( function ( o ) {
+								return o.value !== 'reveal';
+							} ),
 							onChange: function ( value ) {
 								setAttributes( { szmGsapVideoEffect: value } );
 							},
 						} ),
-						showGsapVideo && previewFor( attributes.szmGsapVideoEffect && 'video-' + attributes.szmGsapVideoEffect ),
+						showGsapVideo && attributes.szmGsapVideoEffect !== 'reveal' && previewFor( attributes.szmGsapVideoEffect && 'video-' + attributes.szmGsapVideoEffect ),
 						showGsapVideo && attributes.szmGsapVideoEffect === 'parallax' && el( RangeControl, {
 							label: __( 'Parallax-intensiteit (%)', 'szm-hover-animations' ),
 							value: attributes.szmGsapVideoSpeed || DEFAULT_VIDEO_SPEED,
@@ -935,17 +1053,6 @@
 							max: 50,
 							step: 5,
 						} ),
-						showGsapVideo && attributes.szmGsapVideoEffect === 'reveal' && el( RangeControl, {
-							label: __( 'Snelheid (ms)', 'szm-hover-animations' ),
-							value: attributes.szmGsapVideoSpeed || 800,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapVideoSpeed: value } );
-							},
-							min: 200,
-							max: 2000,
-							step: 100,
-						} ),
-						showGsapVideo && attributes.szmGsapVideoEffect === 'reveal' && easingControl(),
 						showGsapVideo && attributes.szmGsapVideoEffect === 'scrub' && el( RangeControl, {
 							label: __( 'Scrollafstand (% van schermhoogte)', 'szm-hover-animations' ),
 							help: __( 'Hoe ver iemand moet scrollen om de hele video af te spelen. De video wordt vastgepind tijdens het scrubben.', 'szm-hover-animations' ),
@@ -959,81 +1066,6 @@
 						} ),
 						showGsapVideo && attributes.szmGsapVideoEffect === 'scrub' && pinStartControl(),
 						showGsapVideo && attributes.szmGsapVideoEffect === 'scrub' && lockAndCenterControls(),
-
-						// core/heading, core/paragraph: tekst-reveal (SplitText).
-						showGsapText && el( SelectControl, {
-							label: __( 'Tekst-reveal (SplitText)', 'szm-hover-animations' ),
-							value: attributes.szmGsapText || '',
-							options: mapToOptions( GSAP_TEXT_OPTIONS_MAP ),
-							onChange: function ( value ) {
-								setAttributes( { szmGsapText: value } );
-							},
-							help: __( 'Splitst de tekst met SplitText en onthult per letter/woord/regel bij scrollen in beeld. Niet live zichtbaar in de editor.', 'szm-hover-animations' ),
-						} ),
-						showGsapText && previewFor( attributes.szmGsapText && 'text-' + attributes.szmGsapText ),
-						showGsapText && !! attributes.szmGsapText && el( RangeControl, {
-							label: __( 'Snelheid per eenheid (ms)', 'szm-hover-animations' ),
-							value: attributes.szmGsapTextSpeed || DEFAULT_TEXT_SPEED,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapTextSpeed: value } );
-							},
-							min: 200,
-							max: 1500,
-							step: 50,
-						} ),
-						showGsapText && !! attributes.szmGsapText && el( RangeControl, {
-							label: __( 'Stagger tussen eenheden (ms)', 'szm-hover-animations' ),
-							value: attributes.szmGsapTextStagger || DEFAULT_TEXT_STAGGER,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapTextStagger: value } );
-							},
-							min: 0,
-							max: 150,
-							step: 5,
-						} ),
-						showGsapText && !! attributes.szmGsapText && easingControl(),
-
-						// Herhalen: één instelling voor tekst-reveal + counter samen (kan
-						// allebei tegelijk op dezelfde Heading staan), aan by default.
-						( ( showGsapText && !! attributes.szmGsapText ) || ( showGsapCounter && !! attributes.szmGsapCounter ) ) && el( ToggleControl, {
-							label: __( 'Na een tijdje herhalen (verdwijnen + opnieuw afspelen)', 'szm-hover-animations' ),
-							help: __( 'Zolang dit blok in beeld blijft, speelt de animatie na de ingestelde wachttijd steeds opnieuw af, in dezelfde stijl als de eerste keer.', 'szm-hover-animations' ),
-							checked: attributes.szmGsapLoop !== false,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapLoop: value } );
-							},
-						} ),
-						( ( showGsapText && !! attributes.szmGsapText ) || ( showGsapCounter && !! attributes.szmGsapCounter ) ) && attributes.szmGsapLoop !== false && el( SelectControl, {
-							label: __( 'Wachttijd voor herhalen', 'szm-hover-animations' ),
-							value: attributes.szmGsapLoopDelay || DEFAULT_LOOP_DELAY,
-							options: mapToOptions( LOOP_DELAY_OPTIONS_MAP ),
-							onChange: function ( value ) {
-								setAttributes( { szmGsapLoopDelay: value } );
-							},
-						} ),
-
-						// core/heading: animated counter — bewust los van tekst-reveal
-						// hierboven (kan op dezelfde Heading tegelijk aan staan, bv. een
-						// "500+ klanten"-cijfer dat zowel telt als per letter onthult).
-						showGsapCounter && el( ToggleControl, {
-							label: __( 'Getal optellen bij in beeld scrollen', 'szm-hover-animations' ),
-							help: __( 'Herkent het eerste getal in de tekst van deze Heading en telt het op van 0 naar dat getal. Voeg zelf een € of % toe in de tekst; die blijft staan. Niet live zichtbaar in de editor.', 'szm-hover-animations' ),
-							checked: !! attributes.szmGsapCounter,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapCounter: value } );
-							},
-						} ),
-						!! attributes.szmGsapCounter && previewFor( 'counter' ),
-						showGsapCounter && !! attributes.szmGsapCounter && el( RangeControl, {
-							label: __( 'Duur (ms)', 'szm-hover-animations' ),
-							value: attributes.szmGsapCounterSpeed || DEFAULT_COUNTER_SPEED,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapCounterSpeed: value } );
-							},
-							min: 300,
-							max: 4000,
-							step: 100,
-						} ),
 
 						// core/button: magnetic.
 						showGsapMagnetic && el( ToggleControl, {
