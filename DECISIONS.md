@@ -275,3 +275,12 @@ slider alleen op blokken die kinderen kunnen hebben (`ENTRANCE_STAGGER_BLOCKS`).
 
 **Niet gedaan:** nixo's `html.js`-vangnet (nu blijft entrance-content onzichtbaar
 als `frontend.js` niet laadt); Marquee+Entrance-combinatie niet live getest.
+
+## v1.12.0 — preview-GIF onder elke effect-keuze (2026-09-25)
+
+- **Wens:** na het kiezen van een effect in de Inspector een GIF-je zien van wat het doet, goedkoop te maken binnen `/animatie-volledige-flow`.
+- **Werking:** `szm_ha_get_preview_keys()` globt `assets/previews/*.gif` en geeft de sleutels door (`previews`, `previewUrl`). `previewFor(key)` in `editor.js` toont het `<img>` onder de gekozen optie, of niets als er geen bestand is. Sleutel = `<as>-<waarde>` (`hover-lift`, `entrance-reveal`, `columns-slider`, `group-accordion`, `video-scrub`, `text-chars`) of de toggle-naam (`counter`, `magnetic`, `marquee`). Geen nieuwe block-attributes, dus geen validatierisico.
+- **Bron van de GIF (keuze gebruiker):** het origineel van de concurrent voor gepullde effecten (nu alleen `entrance-reveal`, nixowebbuilding 04A). Effecten zonder concurrent-origineel (de rest) zijn opgenomen van ons eigen effect op fse-test: opnamepagina `/szm-previews/` (post 680, `tools/previews/blokken.js`) plus `szm-gsap-demo-2` en `szm-new-hover-effects-demo`. Opnieuw opnemen: `tools/previews/opnames.sh [filter]`.
+- **Opname:** `~/.claude/skills/site-animatie-analyse/scripts/gif.js` (Chrome-screencast + ffmpeg, 320px, 96 kleuren). Gotcha's in de skill-`decisions.md`.
+- **Geverifieerd:** alle 28 GIF's via contactsheets bekeken (beginstand → beweging), Inspector-screenshots voor Entrance (Fade-in reveal) en GSAP (Slider), editor-check 680 + 201: 0 ongeldig, 0 recovery.
+- **Beperkt:** hover-spread en hover-tilt zijn in 320px subtiel; video-GIF's 230–370 KB (lazy geladen, alleen in de editor). Sub-presets (fullpage-overgang stack/slideup/zoom, horizontal stack) hebben geen eigen GIF.
