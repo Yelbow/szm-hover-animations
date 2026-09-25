@@ -198,6 +198,13 @@
 	transform: none;
 }
 
+/* Toepassen op kinderen: de ouder zelf animeert niet, frontend.js geeft de
+   animatie door aan de kind-blokken. Tot dat gebeurd is de ouder verbergen,
+   anders flitsen de kinderen eerst zichtbaar en dan weer weg. */
+.szm-entrance-children:not(.szm-children-ready) {
+	opacity: 0;
+}
+
 /* Verminderde beweging: direct tonen, geen animatie/vertraging. */
 @media (prefers-reduced-motion: reduce) {
 	.szm-entrance {

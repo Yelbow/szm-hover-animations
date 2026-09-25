@@ -14,6 +14,7 @@
 	var SelectControl           = wp.components.SelectControl;
 	var RangeControl            = wp.components.RangeControl;
 	var ToggleControl           = wp.components.ToggleControl;
+	var Button                  = wp.components.Button;
 	var __                      = wp.i18n.__;
 
 	var HOVER_BLOCKS       = settings.blocks || [];
@@ -169,6 +170,100 @@
 	}
 
 	/**
+	 * "Toepassen op kinderen": de container geeft zijn animatie door aan zijn
+	 * kind-blokken. Zelfde regels als collectTargets in assets/frontend.js:
+	 * kolommen/grids/rijen/knoppen/galerij/social-links zijn doorzichtig (hun
+	 * items animeren los), een eigen instelling op een kind wint.
+	 */
+	var PASS_THROUGH_BLOCKS = [ 'core/columns', 'core/buttons', 'core/gallery', 'core/social-links' ];
+
+	function appliesToChildren( name, attributes, kind ) {
+		if ( ! attributes ) {
+			return false;
+		}
+		if ( kind === 'entrance' ) {
+			return ENTRANCE_STAGGER_BLOCKS.indexOf( name ) !== -1 && isEntranceSupported( name ) &&
+				!! attributes.szmEntranceAnimation && attributes.szmEntranceTarget === 'children';
+		}
+		return isHoverSupported( name ) && !! attributes.szmHoverAnimation && attributes.szmHoverTarget === 'children';
+	}
+
+	function hasOwnAnimation( attributes, kind ) {
+		if ( kind === 'entrance' ) {
+			return !! ( attributes.szmEntranceAnimation || attributes.szmGsapText );
+		}
+		return !! attributes.szmHoverAnimation;
+	}
+
+	function hasGsapEffect( attributes ) {
+		return !! ( attributes.szmGsapEffect || attributes.szmGsapSlider || attributes.szmGsapProcess ||
+			attributes.szmGsapAccordion || attributes.szmGsapHorizontal || attributes.szmGsapFullpage ||
+			attributes.szmGsapMarquee || attributes.szmGsapVideoEffect || attributes.szmGsapText ||
+			attributes.szmGsapCounter || attributes.szmGsapMagnetic );
+	}
+
+	function isPassThroughBlock( name, attributes, kind ) {
+		attributes = attributes || {};
+		if ( hasOwnAnimation( attributes, kind ) || hasGsapEffect( attributes ) ) {
+			return false;
+		}
+		if ( PASS_THROUGH_BLOCKS.indexOf( name ) !== -1 ) {
+			return true;
+		}
+		var layout = attributes.layout;
+		return name === 'core/group' && !! layout && (
+			layout.type === 'grid' || ( layout.type === 'flex' && layout.orientation !== 'vertical' )
+		);
+	}
+
+	function countChildTargets( editor, clientId, kind ) {
+		var count = 0;
+		editor.getBlockOrder( clientId ).forEach( function ( childId ) {
+			var childName  = editor.getBlockName( childId );
+			var childAttrs = editor.getBlockAttributes( childId ) || {};
+			if ( isPassThroughBlock( childName, childAttrs, kind ) ) {
+				count += countChildTargets( editor, childId, kind );
+			} else if ( ! hasOwnAnimation( childAttrs, kind ) ) {
+				count++;
+			}
+		} );
+		return count;
+	}
+
+	// clientId van de ouder die zijn animatie aan dit blok doorgeeft, of ''.
+	function findInheritingParent( editor, clientId, kind ) {
+		var name  = editor.getBlockName( clientId );
+		var attrs = editor.getBlockAttributes( clientId ) || {};
+		if ( hasOwnAnimation( attrs, kind ) || isPassThroughBlock( name, attrs, kind ) ) {
+			return '';
+		}
+		var parentId = editor.getBlockRootClientId( clientId );
+		while ( parentId ) {
+			var parentName  = editor.getBlockName( parentId );
+			var parentAttrs = editor.getBlockAttributes( parentId ) || {};
+			if ( appliesToChildren( parentName, parentAttrs, kind ) ) {
+				return parentId;
+			}
+			if ( ! isPassThroughBlock( parentName, parentAttrs, kind ) ) {
+				return '';
+			}
+			parentId = editor.getBlockRootClientId( parentId );
+		}
+		return '';
+	}
+
+	function blockTitle( name ) {
+		var type = wp.blocks.getBlockType( name );
+		return type ? type.title : name;
+	}
+
+	var TARGET_OPTIONS = [
+		{ value: 'self', label: __( 'Dit blok', 'szm-hover-animations' ) },
+		{ value: 'children', label: __( 'Kind-blokken (elk apart)', 'szm-hover-animations' ) },
+	];
+	var DEFAULT_CHILDREN_STAGGER = 100; // ms
+
+	/**
 	 * Legacy-fallback: welk effect stond aan vóór de dropdown-samenvoeging
 	 * (v1.9.0), gelezen uit de oude losse boolean-attributes. Zo blijven al
 	 * gepubliceerde blokken (bv. fse-test post 201, studiozondermeer.nl)
@@ -218,6 +313,8 @@
 			// van of dit blok zelf een hover-animatie heeft.
 			extra.szmHoverGroup     = { type: 'boolean', default: false };
 			extra.szmHoverEasing    = { type: 'string', default: DEFAULT_EASING };
+			// 'children' = animatie doorgeven aan de kind-blokken i.p.v. dit blok.
+			extra.szmHoverTarget    = { type: 'string', default: 'self' };
 		}
 
 		if ( isEntranceSupported( name ) ) {
@@ -226,6 +323,8 @@
 			// Stagger step: hoeveel ms elk volgend kind-blok extra vertraging krijgt.
 			// Wordt ingesteld op een container (bv. Columns/Group) en werkt door naar de directe kinderen.
 			extra.szmEntranceStaggerStep = { type: 'number', default: 0 };
+			// 'children' = animatie doorgeven aan de kind-blokken i.p.v. dit blok.
+			extra.szmEntranceTarget      = { type: 'string', default: 'self' };
 			// Automatisch berekende vertraging voor dit blok (index-onder-siblings x parent-staggerStep).
 			// Niet rechtstreeks door de gebruiker ingesteld, zie withAnimationControls hieronder.
 			extra.szmEntranceDelay       = { type: 'number', default: 0 };
@@ -407,9 +506,61 @@
 				// eslint-disable-next-line
 			}, [ computedDelay, showEntrance ] );
 
+			// Erft dit blok een animatie van een ouder met "Toepassen op kind-
+			// blokken"? Als string teruggeven (geen nieuw object per render).
+			var inheritKey = useSelect( function ( select ) {
+				var editor = select( 'core/block-editor' );
+				if ( ! editor ) {
+					return '';
+				}
+				return findInheritingParent( editor, clientId, 'entrance' ) + '|' +
+					findInheritingParent( editor, clientId, 'hover' );
+			}, [ clientId ] );
+
+			var entranceTargetCount = useSelect( function ( select ) {
+				var editor = select( 'core/block-editor' );
+				return editor && appliesToChildren( name, attributes, 'entrance' ) ? countChildTargets( editor, clientId, 'entrance' ) : 0;
+			}, [ clientId, name, attributes.szmEntranceAnimation, attributes.szmEntranceTarget ] );
+
+			var hoverTargetCount = useSelect( function ( select ) {
+				var editor = select( 'core/block-editor' );
+				return editor && appliesToChildren( name, attributes, 'hover' ) ? countChildTargets( editor, clientId, 'hover' ) : 0;
+			}, [ clientId, name, attributes.szmHoverAnimation, attributes.szmHoverTarget ] );
+
+			var selectBlock = wp.data.useDispatch( 'core/block-editor' ).selectBlock;
+
+			var inheritIds = inheritKey.split( '|' );
+			var inheritPanel = ( inheritIds[ 0 ] || inheritIds[ 1 ] ) && el(
+				PanelBody,
+				{ title: __( 'Animatie via ouder-blok', 'szm-hover-animations' ), initialOpen: true },
+				[ [ 'entrance', inheritIds[ 0 ], __( 'Entrance', 'szm-hover-animations' ) ], [ 'hover', inheritIds[ 1 ], __( 'Hover', 'szm-hover-animations' ) ] ]
+					.filter( function ( row ) {
+						return !! row[ 1 ];
+					} )
+					.map( function ( row ) {
+						var parentName = wp.data.select( 'core/block-editor' ).getBlockName( row[ 1 ] );
+						return el( 'p', { key: row[ 0 ] },
+							row[ 2 ] + ': ' + __( 'ingesteld op', 'szm-hover-animations' ) + ' ',
+							el( Button, {
+								variant: 'link',
+								onClick: function () {
+									selectBlock( row[ 1 ] );
+								},
+							}, blockTitle( parentName ) )
+						);
+					} ),
+				el( 'p', { className: 'components-base-control__help' },
+					__( 'Stel hier zelf een animatie in om die voor dit blok te overschrijven.', 'szm-hover-animations' ) )
+			);
+
 			if ( ! showHover && ! showEntrance && ! showGsapBox ) {
-				return el( BlockEdit, props );
+				return inheritPanel ?
+					el( Fragment, null, el( BlockEdit, props ), el( InspectorControls, null, inheritPanel ) ) :
+					el( BlockEdit, props );
 			}
+
+			var entranceTarget = attributes.szmEntranceTarget === 'children' ? 'children' : 'self';
+			var hoverTarget    = attributes.szmHoverTarget === 'children' ? 'children' : 'self';
 
 			// Welk effect toont de GSAP-dropdown als geselecteerd: het nieuwe
 			// szmGsapEffect-attribute als dat al is aangeraakt, anders afgeleid
@@ -515,6 +666,7 @@
 				el(
 					InspectorControls,
 					null,
+					inheritPanel,
 					showHover && el(
 						PanelBody,
 						{ title: __( 'Hover animatie', 'szm-hover-animations' ), initialOpen: true },
@@ -527,6 +679,17 @@
 							},
 						} ),
 						previewFor( attributes.szmHoverAnimation && 'hover-' + attributes.szmHoverAnimation ),
+						!! attributes.szmHoverAnimation && el( SelectControl, {
+							label: __( 'Toepassen op', 'szm-hover-animations' ),
+							help: hoverTarget === 'children' ?
+								hoverTargetCount + ' ' + __( 'blokken krijgen dit effect. Kolommen, grids, rijen, knoppen en galerijen worden doorlopen: hun items elk apart.', 'szm-hover-animations' ) :
+								'',
+							value: hoverTarget,
+							options: TARGET_OPTIONS,
+							onChange: function ( value ) {
+								setAttributes( { szmHoverTarget: value } );
+							},
+						} ),
 						!! attributes.szmHoverAnimation && el( RangeControl, {
 							label: __( 'Snelheid (ms)', 'szm-hover-animations' ),
 							value: attributes.szmHoverSpeed || DEFAULT_HOVER_SPEED,
@@ -572,6 +735,22 @@
 							},
 						} ),
 						previewFor( attributes.szmEntranceAnimation && 'entrance-' + attributes.szmEntranceAnimation ),
+						!! attributes.szmEntranceAnimation && ENTRANCE_STAGGER_BLOCKS.indexOf( name ) !== -1 && el( SelectControl, {
+							label: __( 'Toepassen op', 'szm-hover-animations' ),
+							help: entranceTarget === 'children' ?
+								entranceTargetCount + ' ' + __( 'blokken komen elk apart binnen, op volgorde. Kolommen, grids, rijen, knoppen en galerijen worden doorlopen: hun items elk apart.', 'szm-hover-animations' ) :
+								'',
+							value: entranceTarget,
+							options: TARGET_OPTIONS,
+							onChange: function ( value ) {
+								var next = { szmEntranceTarget: value };
+								// Zonder stagger komen alle kinderen tegelijk: geef een startwaarde.
+								if ( value === 'children' && ! attributes.szmEntranceStaggerStep ) {
+									next.szmEntranceStaggerStep = DEFAULT_CHILDREN_STAGGER;
+								}
+								setAttributes( next );
+							},
+						} ),
 						ENTRANCE_DISTANCE_DEFAULTS.hasOwnProperty( attributes.szmEntranceAnimation ) && el( RangeControl, {
 							label: __( 'Schuifafstand (px)', 'szm-hover-animations' ),
 							value: typeof attributes.szmEntranceDistance === 'number' ? attributes.szmEntranceDistance : ENTRANCE_DISTANCE_DEFAULTS[ attributes.szmEntranceAnimation ],
@@ -602,7 +781,9 @@
 						} ),
 						ENTRANCE_STAGGER_BLOCKS.indexOf( name ) !== -1 && el( RangeControl, {
 							label: __( 'Stagger: vertraging per kind-blok (ms)', 'szm-hover-animations' ),
-							help: __( 'Geldt voor de directe kind-blokken van dit blok (bv. kolommen in een Columns-blok), niet voor dit blok zelf.', 'szm-hover-animations' ),
+							help: entranceTarget === 'children' ?
+								__( 'Tijd tussen elk volgend blok dat binnenkomt.', 'szm-hover-animations' ) :
+								__( 'Geldt voor de directe kind-blokken van dit blok die zelf een entrance hebben (bv. kolommen in een Columns-blok), niet voor dit blok zelf.', 'szm-hover-animations' ),
 							value: attributes.szmEntranceStaggerStep || 0,
 							onChange: function ( value ) {
 								setAttributes( { szmEntranceStaggerStep: value } );
@@ -927,7 +1108,14 @@
 		var name    = blockType.name;
 
 		if ( isHoverSupported( name ) && attributes.szmHoverAnimation ) {
-			classes.push( 'szm-hover', classForHover( attributes.szmHoverAnimation ) );
+			if ( appliesToChildren( name, attributes, 'hover' ) ) {
+				// frontend.js zet szm-hover-{variant} op de kind-blokken; de
+				// CSS-variabelen hieronder erven ze van dit blok.
+				classes.push( 'szm-hover-children' );
+				extraProps[ 'data-szm-hover-children' ] = attributes.szmHoverAnimation;
+			} else {
+				classes.push( 'szm-hover', classForHover( attributes.szmHoverAnimation ) );
+			}
 			style[ '--szm-hover-speed' ] = ( attributes.szmHoverSpeed || DEFAULT_HOVER_SPEED ) + 'ms';
 			style[ '--szm-hover-ease' ]  = EASE_CSS_MAP[ attributes.szmHoverEasing || DEFAULT_EASING ] || EASE_CSS_MAP[ DEFAULT_EASING ];
 		}
@@ -937,9 +1125,21 @@
 		}
 
 		if ( isEntranceSupported( name ) && attributes.szmEntranceAnimation ) {
-			classes.push( 'szm-entrance', classForEntrance( attributes.szmEntranceAnimation ) );
+			if ( appliesToChildren( name, attributes, 'entrance' ) ) {
+				// frontend.js zet szm-entrance-{variant} op de kind-blokken en
+				// rekent daar de stagger-vertraging uit (geen vaste delay hier).
+				classes.push( 'szm-entrance-children' );
+				extraProps[ 'data-szm-entrance-children' ] = attributes.szmEntranceAnimation;
+				extraProps[ 'data-szm-stagger' ]           = attributes.szmEntranceStaggerStep || 0;
+			} else {
+				classes.push( 'szm-entrance', classForEntrance( attributes.szmEntranceAnimation ) );
+			}
+			// Volgorde van deze keys niet wijzigen: bepaalt de opgeslagen style-
+			// string, anders block recovery op al gepubliceerde blokken.
 			style[ '--szm-entrance-speed' ] = ( attributes.szmEntranceSpeed || DEFAULT_ENTRANCE_SPEED ) + 'ms';
-			style[ '--szm-entrance-delay' ] = ( attributes.szmEntranceDelay || 0 ) + 'ms';
+			if ( ! appliesToChildren( name, attributes, 'entrance' ) ) {
+				style[ '--szm-entrance-delay' ] = ( attributes.szmEntranceDelay || 0 ) + 'ms';
+			}
 			style[ '--szm-entrance-ease' ]  = EASE_CSS_MAP[ attributes.szmEntranceEasing || DEFAULT_EASING ] || EASE_CSS_MAP[ DEFAULT_EASING ];
 			if ( typeof attributes.szmEntranceDistance === 'number' ) {
 				style[ '--szm-entrance-distance' ] = attributes.szmEntranceDistance + 'px';
@@ -1073,9 +1273,9 @@
 		return function ( props ) {
 			var name       = props.name;
 			var attributes = props.attributes;
-			var showHover    = isHoverSupported( name ) && !! attributes.szmHoverAnimation;
+			var showHover    = isHoverSupported( name ) && !! attributes.szmHoverAnimation && ! appliesToChildren( name, attributes, 'hover' );
 			var showHoverGroup = isHoverSupported( name ) && !! attributes.szmHoverGroup;
-			var showEntrance = isEntranceSupported( name ) && !! attributes.szmEntranceAnimation;
+			var showEntrance = isEntranceSupported( name ) && !! attributes.szmEntranceAnimation && ! appliesToChildren( name, attributes, 'entrance' );
 
 			if ( ! showHover && ! showHoverGroup && ! showEntrance ) {
 				return el( BlockListBlock, props );
