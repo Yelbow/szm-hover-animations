@@ -43,3 +43,19 @@ Nieuwe ronde: kandidaten nagelopen en zover mogelijk live gemeten op
 - Notitie: de teller-regex pakt een minteken niet mee ("-20" telt naar 20 met een
   losse min ervoor). Nagekeken en géén bug: de min blijft staan, het getal telt op
   vanaf 0, dus de uitkomst klopt. Bewust zo gelaten.
+
+## v1.14.3: exclusie met de positioneer-plugin (2026-09-27)
+
+- [x] **Pin-effecten en de slider zijn uitgeschakeld als het blok gepositioneerd
+      is.** Het effect-keuzemenu van Columns (slider / proces-stappen) en van
+      Group (accordion / horizontaal / full-viewport) staat op `disabled` zodra
+      `szmPos` aan staat, met een waarschuwing bovenaan "Scroll & interactie".
+      Niet om te pesten: een anker schrijft position/left/top en een
+      midden-anker een translate, terwijl die effecten pinnen met
+      `position: fixed` of de container met xPercent uit de flow zetten. De
+      positioneer-plugin blokkeert dezelfde combinaties van de andere kant.
+- [x] **`scrub` valt uit de video-effectenlijst zolang het blok gepositioneerd
+      is** (reveal en parallax blijven gewoon staan; die werken wel samen).
+- [x] Gemeten in de editor op pagina 201 via de store: slider zonder anker geen
+      melding en menu's bruikbaar; met `szmPos` erop de melding zichtbaar en het
+      effect-menu uitgeschakeld. Attributen daarna teruggezet.

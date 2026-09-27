@@ -376,3 +376,21 @@ als `frontend.js` niet laadt); Marquee+Entrance-combinatie niet live getest.
   (het is een kop met role="button"), dus die blijft gewoon werken.
 - **`primeVideo()` herstelt de mute-stand.** Een video die met geluid is geplaatst
   bleef na het primen permanent op mute staan.
+
+## v1.14.3 — exclusie met de positioneer-plugin (2026-09-27)
+
+- **Slider, proces-stappen, horizontaal scrollen, full-viewport slides en
+  video-scrub gaan niet samen met een anker, en dat is nu afgedwongen.** Deze
+  effecten pinnen (`position: fixed` plus een pin-spacer) of zetten de container
+  met xPercent uit de flow; het anker schrijft position/left/top en bij een
+  midden-anker een translate. Dezelfde eigenschappen, dus de UI laat het niet
+  meer toe zolang `szmPos` aan staat: waarschuwingsblok plus `disabled` op de
+  twee effect-keuzemenu's, en `scrub` valt uit de video-lijst.
+- **Waarom in de UI en niet in de CSS of in JS:** dit is geen bug die je kunt
+  oplossen, het is een keuze die de gebruiker op één blok niet moet kunnen maken.
+  Dezelfde lijst staat in de positioneer-plugin, zodat de melding verschijnt
+  ongeacht aan welke kant je begint.
+- **Wat er niet in zit:** de accordion zelf (die zet een eigen wrapper om de
+  kinderen) is geen conflict meer, want de positioneer-plugin maakt nu elke
+  directe ouder relative in plaats van een whitelist. Alleen pinnen blijft een
+  echt conflict.

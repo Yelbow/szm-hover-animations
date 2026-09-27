@@ -15,6 +15,7 @@
 	var RangeControl            = wp.components.RangeControl;
 	var ToggleControl           = wp.components.ToggleControl;
 	var Button                  = wp.components.Button;
+	var Notice                  = wp.components.Notice;
 	var __                      = wp.i18n.__;
 
 	var HOVER_BLOCKS       = settings.blocks || [];
@@ -548,6 +549,19 @@
 
 			var selectBlock = wp.data.useDispatch( 'core/block-editor' ).selectBlock;
 
+			// Exclusie met SZM Absolute Positioning: een anker schrijft
+			// position:absolute plus left/top (en bij een midden-anker een
+			// translate), terwijl deze effecten het blok pinnen met position:fixed,
+			// er een pin-spacer omheen schuiven, of de container met xPercent uit de
+			// flow zetten. De positioneer-plugin blokkeert dezelfde combinaties van
+			// de andere kant (zie CONFLICT_EFFECTS in diens editor.js).
+			var positionConflict = !! attributes.szmPos;
+			var positionNotice = positionConflict && el(
+				Notice,
+				{ status: 'warning', isDismissible: false },
+				__( 'Dit blok staat op een absolute positie (SZM Absolute Positioning). Een slider of pin-effect vecht daar in de CSS mee: zet eerst het positioneren uit als je zo\'n effect wilt.', 'szm-hover-animations' )
+			);
+
 			var inheritIds = inheritKey.split( '|' );
 			var inheritPanel = ( inheritIds[ 0 ] || inheritIds[ 1 ] ) && el(
 				PanelBody,
@@ -911,6 +925,7 @@
 					showGsapBox && el(
 						PanelBody,
 						{ title: __( 'Scroll & interactie', 'szm-hover-animations' ), initialOpen: false },
+						positionNotice,
 
 						// core/columns: slider of sticky proces-stappen.
 						showColumnsFamily && el( SelectControl, {
@@ -918,6 +933,8 @@
 							value: columnsEffect,
 							options: mapToOptions( GSAP_COLUMNS_OPTIONS_MAP ),
 							onChange: handleColumnsEffectChange,
+							// Slider en proces-stappen gaan niet samen met een anker.
+							disabled: positionConflict,
 						} ),
 						showColumnsFamily && previewFor( columnsEffect && 'columns-' + columnsEffect ),
 						showColumnsFamily && columnsEffect === 'slider' && el( RangeControl, {
@@ -968,6 +985,10 @@
 							value: groupEffect,
 							options: mapToOptions( GSAP_GROUP_OPTIONS_MAP ),
 							onChange: handleGroupEffectChange,
+							// Horizontaal scrollen en full-viewport slides pinnen; accordion
+							// zet een eigen wrapper om de kinderen. Geen van drieën samen met
+							// een anker.
+							disabled: positionConflict,
 						} ),
 						showGroupFamily && previewFor( groupEffect && 'group-' + groupEffect ),
 						showGroupFamily && groupEffect === 'accordion' && el( RangeControl, {
@@ -1036,7 +1057,9 @@
 							// "reveal" staat in de Entrance-dropdown (v1.14.0).
 							value: attributes.szmGsapVideoEffect === 'reveal' ? '' : ( attributes.szmGsapVideoEffect || '' ),
 							options: mapToOptions( GSAP_VIDEO_OPTIONS_MAP ).filter( function ( o ) {
-								return o.value !== 'reveal';
+								// 'scrub' pint de video vast en volgt de scrollpositie;
+								// met een anker erop vecht dat om dezelfde eigenschappen.
+								return o.value !== 'reveal' && ! ( positionConflict && o.value === 'scrub' );
 							} ),
 							onChange: function ( value ) {
 								setAttributes( { szmGsapVideoEffect: value } );
