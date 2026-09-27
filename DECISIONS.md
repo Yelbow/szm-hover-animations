@@ -355,3 +355,24 @@ als `frontend.js` niet laadt); Marquee+Entrance-combinatie niet live getest.
 - **Opslag ongewijzigd** (`szmGsapText`, `szmGsapVideoEffect`, `szmEntranceAnimation`): alleen de UI verhuist, dus geen validatierisico. Dropdown-waarden `text-<x>` / `video-reveal` bestaan alleen in de UI en zijn ook de preview-GIF-sleutels.
 - **GSAP-paneel heet nu "Scroll & interactie"** (slider, proces, accordion, horizontal, fullpage, parallax, scrub, play-on-scroll, marquee, magnetic). Regel voor nieuwe effecten: indelen op trigger, niet op techniek.
 - **Geverifieerd:** editor-check 680/201/676 0 ongeldig; wisselen in de dropdown zet de juiste attributes (Playwright); video-dropdown in Scroll & interactie zonder reveal. Post 199 (`szm-gsap-demo`, oude pagina) heeft 4 ongeldige blokken, ook al op v1.11.1 en v1.13.0: bestond al, niet door deze wijziging.
+
+## v1.14.2 — fixes na de nieuwe bugscan (2026-09-27)
+
+- **Autoplay stopt buiten beeld (IntersectionObserver) en hervat in beeld.** Zelfde
+  gedachte als bij de entrance-replay: niets animeren wat niemand ziet. Pijltjes en
+  dots stoppen autoplay nog steeds, en hover pauzeert/hervat zoals eerst.
+- **Video-parallax krijgt overmaat plus clip.** Een parallax die binnen een kader
+  beweegt moet groter zijn dan dat kader, anders zie je een gat aan de ene kant en
+  beeld over de buren aan de andere kant. Overmaat = 2× de uitslag van
+  `data-szm-video-speed`, gezet in `initVideoEffects()`; `overflow: hidden` op de
+  wrapper staat in style.css. De crop die daardoor ontstaat is met de
+  snelheidsinstelling te verkleinen (uitslag 0 = geen crop).
+- **Accordion-dichtheid zit nu in de DOM, niet alleen in CSS.** `aria-hidden` +
+  `inert` op een dichtgeklapt paneel, met een tabindex-terugval voor browsers
+  zonder inert. Reden: height:0 houdt de inhoud leesbaar voor schermlezers en met
+  Tab bereikbaar, wat WCAG 2.4.3/2.4.7 breekt.
+- **Klikken op een link of knop in een accordion-kop toggelt niet meer.** De guard
+  kijkt naar `e.target.closest('a, button')`; de kop zelf is geen `<a>`/`<button>`
+  (het is een kop met role="button"), dus die blijft gewoon werken.
+- **`primeVideo()` herstelt de mute-stand.** Een video die met geluid is geplaatst
+  bleef na het primen permanent op mute staan.

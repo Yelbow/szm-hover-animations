@@ -42,19 +42,35 @@
 	 * that first decode. No-op, silently, if the browser refuses anyway.
 	 */
 	function primeVideo( video ) {
-		video.muted = true;
-		video.setAttribute( 'muted', '' );
+		// Onthoud of de video al stil stond: het primen mag een video met
+		// geluid niet permanent op mute achterlaten (dan hoor je hem nooit
+		// meer als de bezoeker zelf op play drukt).
+		var wasMuted = video.muted || video.hasAttribute( 'muted' );
+		if ( ! wasMuted ) {
+			video.muted = true;
+		}
 		video.setAttribute( 'playsinline', '' );
 		var playPromise = video.play();
+
+		function restoreMuted() {
+			if ( ! wasMuted ) {
+				video.muted = false;
+				video.removeAttribute( 'muted' );
+			}
+		}
+
 		if ( playPromise && typeof playPromise.then === 'function' ) {
 			playPromise.then( function () {
 				video.pause();
+				restoreMuted();
 			} ).catch( function () {
 				// Autoplay refused (e.g. low-power mode) — nothing more we can do
 				// without a user gesture; the effect still degrades gracefully.
+				restoreMuted();
 			} );
 		} else {
 			video.pause();
+			restoreMuted();
 		}
 	}
 
@@ -353,6 +369,23 @@
 
 			goTo( 0, false );
 			startAutoplay();
+
+			// Autoplay hoort te stoppen zodra de slider buiten beeld is: anders
+			// blijft de timer doorlopen en animeren er slides die niemand ziet
+			// (verspilde CPU op mobiel). Zodra de slider weer in beeld komt,
+			// gaat hij verder. WCAG 2.2.2 vraagt daarnaast om een zichtbare
+			// pauzeknop; dat is een ontwerpkeuze, zie TODO.md.
+			if ( 'IntersectionObserver' in window ) {
+				new IntersectionObserver( function ( entries ) {
+					entries.forEach( function ( entry ) {
+						if ( entry.isIntersecting ) {
+							startAutoplay();
+						} else {
+							stopAutoplay();
+						}
+					} );
+				}, { threshold: 0 } ).observe( wrapper );
+			}
 		} );
 	}
 
@@ -548,6 +581,7 @@
 				trigger.setAttribute( 'aria-expanded', isOpen ? 'true' : 'false' );
 
 				var panel = { item: item, trigger: trigger, content: content, open: isOpen };
+				setCollapsed( panel, ! isOpen );
 
 				function toggle() {
 					if ( ! allowMultiple && ! panel.open ) {
@@ -560,7 +594,15 @@
 					panel.open ? closePanel( panel ) : openPanel( panel );
 				}
 
-				trigger.addEventListener( 'click', toggle );
+				trigger.addEventListener( 'click', function ( e ) {
+					// Een link of knop ín de kop (bijvoorbeeld "Lees meer") doet
+					// zijn eigen ding; zonder deze guard klapte het paneel dan
+					// ook open of dicht terwijl de bezoeker iets anders klikte.
+					if ( e.target && e.target.closest && e.target.closest( 'a, button' ) ) {
+						return;
+					}
+					toggle();
+				} );
 				trigger.addEventListener( 'keydown', function ( e ) {
 					if ( e.key === 'Enter' || e.key === ' ' ) {
 						e.preventDefault();
@@ -571,10 +613,47 @@
 				return panel;
 			} ).filter( Boolean );
 
+			// Een dichtgeklapt paneel is met height:0 alleen visueel weg: de inhoud
+			// blijft leesbaar voor een schermlezer en met Tab te bereiken. aria-hidden
+			// plus inert zet hem ook echt uit; browsers zonder inert (oudere Safari)
+			// krijgen de terugval dat de kinderen uit de tab-orde gaan.
+			var FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]';
+
+			function setCollapsed( panel, collapsed ) {
+				if ( collapsed ) {
+					panel.content.setAttribute( 'aria-hidden', 'true' );
+				} else {
+					panel.content.removeAttribute( 'aria-hidden' );
+				}
+
+				if ( 'inert' in panel.content ) {
+					panel.content.inert = collapsed;
+					return;
+				}
+
+				panel.content.querySelectorAll( FOCUSABLE ).forEach( function ( el ) {
+					if ( collapsed ) {
+						if ( ! el.hasAttribute( 'data-szm-tabindex' ) ) {
+							el.setAttribute( 'data-szm-tabindex', el.getAttribute( 'tabindex' ) || '' );
+						}
+						el.setAttribute( 'tabindex', '-1' );
+					} else if ( el.hasAttribute( 'data-szm-tabindex' ) ) {
+						var previous = el.getAttribute( 'data-szm-tabindex' );
+						el.removeAttribute( 'data-szm-tabindex' );
+						if ( previous === '' ) {
+							el.removeAttribute( 'tabindex' );
+						} else {
+							el.setAttribute( 'tabindex', previous );
+						}
+					}
+				} );
+			}
+
 			function openPanel( panel ) {
 				panel.open = true;
 				panel.item.classList.add( 'is-open' );
 				panel.trigger.setAttribute( 'aria-expanded', 'true' );
+				setCollapsed( panel, false );
 				if ( prefersReducedMotion ) {
 					gsap.set( panel.content, { height: 'auto' } );
 					return;
@@ -586,6 +665,7 @@
 				panel.open = false;
 				panel.item.classList.remove( 'is-open' );
 				panel.trigger.setAttribute( 'aria-expanded', 'false' );
+				setCollapsed( panel, true );
 				if ( prefersReducedMotion ) {
 					gsap.set( panel.content, { height: 0 } );
 					return;
@@ -610,6 +690,13 @@
 				return;
 			}
 			var intensity = num( wrapper.getAttribute( 'data-szm-video-speed' ), 20 );
+			// De video beweegt ±intensity% van zijn eigen hoogte op en neer.
+			// Zonder overmaat schuift hij uit zijn kader: aan de ene kant een
+			// gat (de achtergrond van de wrapper) en aan de andere kant beeld
+			// dat over de buren heen valt. Daarom eerst vergroten met precies
+			// genoeg marge (2× de uitslag) en de wrapper laten clippen — die
+			// overflow staat in assets/style.css.
+			gsap.set( video, { scale: 1 + ( Math.abs( intensity ) * 2 ) / 100 } );
 			gsap.fromTo(
 				video,
 				{ yPercent: -intensity },

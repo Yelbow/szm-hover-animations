@@ -230,6 +230,13 @@
  * en vóór init) en editor-fallbacks.
  */
 
+/* Video-parallax: het beeld beweegt binnen zijn kader, dus het kader moet
+   clippen. De overmaat van de video zelf zet de JS (scale in gsap-effects.js,
+   2× de uitslag van data-szm-video-speed). */
+.szm-gsap-video-parallax {
+	overflow: hidden;
+}
+
 /* Slider (core/columns). */
 .szm-gsap-slider-wrapper {
 	position: relative;
