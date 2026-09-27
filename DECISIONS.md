@@ -1,5 +1,49 @@
 # DECISIONS
 
+## 2026-09-27: v1.14.1, vier bugfixes na de bugscan
+
+Alle vier in een echte browser nagerekend op fse-test (zie BUGSCAN.md).
+
+**De teller schrijft nu in een eigen span i.p.v. `el.textContent`.** Die
+eigenschap vervangt de hele kopinhoud, dus elk kind-element verdween:
+`<strong>500+</strong>` werd platte tekst, `<em>€ 250</em>` verloor zijn em, en
+een kop met tekst-reveal erop verloor de hele SplitText-opbouw (de reveal speelde
+daarna op losgekoppelde nodes en was onzichtbaar, terwijl de editor die
+combinatie expliciet aanbiedt). Nu zet `wrapCounterNumber()` het gevonden getal
+in een `<span class="szm-gsap-counter-value">` en schrijft alleen die span
+bij. Een getal dat over meerdere tekstnodes verdeeld is (bijv. `1.` +
+`<em>500</em>`) gaat in zijn geheel naar de span, met een leeg element achter op
+de oude plek en zonder tekstverlies. Nagerekend: `strong` en `em` blijven staan,
+de tellerwaarde zit in de span, en een kop met reveal plus teller houdt zijn 5
+split-eenheden en onthult ze netjes.
+
+**Getallen: notatie van het origineel volgen i.p.v. alle punten wegstrepen.**
+De oude regel (`replace(/\./g, '')`) zag een punt altijd als duizendtal, dus
+"Omzet 3.5 miljoen" telde naar 35, en de uitvoer werd zonder scheidingstekens
+geschreven, dus "Al 1.500 projecten" eindigde als "Al 1500 projecten".
+`parseCounterNumber()` bepaalt nu of de laatste groep decimalen zijn (1 of 2
+cijfers) of duizendtallen (3+), onthoudt welke tekens er gebruikt zijn en
+`formatCounterNumber()` schrijft de waarde in dezelfde notatie terug.
+Nagerekend: 3.5 blijft 3.5, 3,5 blijft 3,5, 1.500 blijft 1.500, 1.234,56 blijft
+1.234,56.
+
+**Reset laat de eindwaarde staan i.p.v. 0.** Bij het uit beeld raken zette de
+reset de tekst op 0, waardoor er "0+ klanten" in de DOM bleef staan (schermlezer,
+crawler, screenshot). De tween gaat nog steeds terug naar 0 voor de replay, maar
+de tekst krijgt de eindwaarde. Nagerekend op `/szm-gsap-demo-2/`: na 14
+scrollstappen staat er nog "500+ klanten | 98% tevreden | 12 jaar ervaring"
+(voorheen alle drie op 0), en terugscrollen replayt vanaf 0.
+
+**Touch-hover: timer per element.** Eén gedeelde `activeTimer` werd door de
+tweede tik geannuleerd, waardoor het eerst geraakte blok voorgoed in de
+hover-stand bleef staan. Nu `el.szmHoverTouchTimer`. Nagerekend met een
+touch-spoof: twee tikken 100 ms na elkaar laten na 900 ms beide blokken weer los.
+
+Bekend gebleven risico: een `data-szm-*`-toevoeging op een bestaand effect
+breekt de blokvalidatie van pagina's die dat effect al gebruiken (zie 2026-09-15).
+Deze release voegt geen nieuwe data-attributen toe, dus geen nieuwe validatiebreuk.
+
+
 ## 2026-09-15 — v1.9.0 Inspector redesign (1 box per axis, pin-start, easing, sticky-header offset)
 
 **Attribute migration: dual-read, not one-time rewrite.** Old per-effect booleans

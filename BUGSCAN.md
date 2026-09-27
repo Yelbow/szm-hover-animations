@@ -106,6 +106,24 @@ bovendien een betaald GSAP-plugin (Club GreenSock) die je hier vendor't: voor
 klantsites is het goed om te weten dat die licentie per project moet kloppen.
 Geen bug, wel iets om bewust te zijn.
 
+## Stand na v1.14.1 (2026-09-27)
+
+Alle vier de bugs hierboven zijn gefixt, gedeployed naar fse-test en daar in een
+echte browser nagerekend. Kort per bug:
+
+- Teller sloopt de opmaak: nu schrijft hij in een eigen
+  `<span class="szm-gsap-counter-value">`. Gemeten: `<strong>` en `<em>` blijven
+  staan, de waarde zit in de span.
+- Teller plus tekst-reveal: werkt nu samen, 5 split-eenheden blijven leven en
+  onthullen netjes.
+- Getalnotatie: 3.5 blijft 3.5, 1.500 blijft 1.500, 1.234,56 blijft 1.234,56.
+- Reset: op `/szm-gsap-demo-2/` staat na hetzelfde scrollen nog "500+ klanten |
+  98% tevreden | 12 jaar ervaring" in plaats van drie keer 0.
+- Touch-hover: timer per element; twee tikken 100 ms na elkaar laten beide
+  blokken na 900 ms weer los.
+
+Wat nog open staat (slider-uitlijning, GSAP-load, lange secties) staat in PLAN.md.
+
 ## Verder nog nagekeken, geen bug gevonden
 
 - Entrance-threshold: bij `threshold: 0.15` kan een blok dat hoger is dan

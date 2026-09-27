@@ -134,7 +134,6 @@
 		}
 
 		var prefersReducedMotion = window.matchMedia && window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
-		var activeTimer = null;
 
 		elements.forEach ? elements.forEach( bind ) : Array.prototype.forEach.call( elements, bind );
 
@@ -143,14 +142,18 @@
 				if ( prefersReducedMotion ) {
 					return;
 				}
-				window.clearTimeout( activeTimer );
+				// Timer per element (niet één gedeelde): met één gedeelde timer
+				// annuleerde een tweede tik de timer van het eerste blok, en dat
+				// eerste blok bleef dan voorgoed in de hover-stand staan.
+				window.clearTimeout( el.szmHoverTouchTimer );
 				el.classList.add( 'szm-hover-touch-active' );
-				// Zelf weer verwijderen na een korte "preview"-pauze — geen
+				// Zelf weer verwijderen na een korte "preview"-pauze: geen
 				// touchend/touchcancel nodig, en werkt ook als de vinger
 				// wegschuift naar scrollen (touchend zou dan niet op dit
 				// element vuren).
-				activeTimer = window.setTimeout( function () {
+				el.szmHoverTouchTimer = window.setTimeout( function () {
 					el.classList.remove( 'szm-hover-touch-active' );
+					el.szmHoverTouchTimer = null;
 				}, 600 );
 			}, { passive: true } );
 		}

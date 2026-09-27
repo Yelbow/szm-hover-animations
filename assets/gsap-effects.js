@@ -872,30 +872,184 @@
 	}
 
 	/**
+	 * Zet het eerste getal in $el in een eigen <span> en geeft die terug, zodat
+	 * het bijwerken van de teller de rest van de kop met rust laat: inline
+	 * opmaak (strong/em/span/br/links) blijft staan en een al gesplitste
+	 * tekst-reveal (SplitText zet elk woord in een eigen span) blijft werken.
+	 *
+	 * Een getal dat over meerdere tekstnodes verdeeld is (bijv. "1." + "<em>500</em>")
+	 * wordt in zijn geheel in de span gezet; er blijft dan een leeg element achter
+	 * op de plek waar het getal stond, zonder tekstverlies.
+	 *
+	 * Geeft { span, raw } terug, of null als er geen getal in staat.
+	 */
+	function wrapCounterNumber( el ) {
+		var walker = document.createTreeWalker( el, NodeFilter.SHOW_TEXT, null );
+		var nodes  = [];
+		var text   = '';
+		var node;
+
+		while ( ( node = walker.nextNode() ) ) {
+			nodes.push( { node: node, start: text.length } );
+			text += node.nodeValue;
+		}
+
+		var match = text.match( /[\d.,]+/ );
+		if ( ! match ) {
+			return null;
+		}
+
+		var start = match.index;
+		var end   = match.index + match[ 0 ].length;
+		var span  = document.createElement( 'span' );
+		span.className = 'szm-gsap-counter-value';
+
+		var moved = false;
+		for ( var i = 0; i < nodes.length; i++ ) {
+			var len    = nodes[ i ].node.nodeValue.length;
+			var gStart = nodes[ i ].start;
+			var gEnd   = gStart + len;
+			var from   = start > gStart ? start : gStart;
+			var to     = end < gEnd ? end : gEnd;
+			if ( from >= to ) {
+				continue;
+			}
+
+			var current = nodes[ i ].node;
+			var parent  = current.parentNode;
+			if ( ! parent ) {
+				continue;
+			}
+
+			var head = current.nodeValue.slice( 0, from - gStart );
+			var mid  = current.nodeValue.slice( from - gStart, to - gStart );
+			var tail = current.nodeValue.slice( to - gStart );
+
+			if ( head ) {
+				parent.insertBefore( document.createTextNode( head ), current );
+			}
+			if ( ! span.parentNode ) {
+				// De span zelf één keer plaatsen; de stukken uit volgende nodes
+				// hangen we eraan vast met appendChild, dat verplaatst ze, dus de
+				// leesorde blijft kloppen.
+				parent.insertBefore( span, current );
+			}
+			span.appendChild( document.createTextNode( mid ) );
+			if ( tail ) {
+				parent.insertBefore( document.createTextNode( tail ), current );
+			}
+			parent.removeChild( current );
+			moved = true;
+		}
+
+		if ( ! moved ) {
+			return null;
+		}
+		return { span: span, raw: match[ 0 ] };
+	}
+
+	/**
+	 * Leest het getal uit de kop én onthoudt de notatie die er stond, zodat de
+	 * uitkomst dezelfde vorm houdt: "1.500" blijft 1.500 (duizendtal), "3,5"
+	 * blijft 3,5 en "3.5" blijft 3.5 (decimaal).
+	 *
+	 * De oude regel (alle punten weg, dan de eerste komma naar punt) maakte van
+	 * "Omzet 3.5 miljoen" het getal 35 en schreef "Al 1.500 projecten" terug als
+	 * "Al 1500 projecten".
+	 */
+	function parseCounterNumber( raw ) {
+		var parts = String( raw ).split( /[.,]/ );
+		var intPart = parts[ 0 ];
+		var decPart = '';
+		var decimalSep = '';
+		var thousandsSep = '';
+		var grouped = false;
+
+		if ( parts.length > 1 ) {
+			var last = parts[ parts.length - 1 ];
+			if ( last.length >= 1 && last.length <= 2 ) {
+				// Laatste groep van 1 of 2 cijfers: dat zijn decimalen.
+				decPart      = last;
+				intPart      = parts.slice( 0, -1 ).join( '' );
+				decimalSep   = raw.charAt( raw.length - last.length - 1 );
+				thousandsSep = decimalSep === '.' ? ',' : '.';
+				grouped      = parts.length > 2;
+			} else {
+				// Alles duizendtallen: "1.500", "1,234,567".
+				intPart      = parts.join( '' );
+				thousandsSep = raw.charAt( raw.length - last.length - 1 );
+				decimalSep   = thousandsSep === '.' ? ',' : '.';
+				grouped      = true;
+			}
+		} else {
+			decimalSep   = ',';
+			thousandsSep = '.';
+		}
+
+		var value = parseFloat( intPart + ( decPart ? '.' + decPart : '' ) );
+		if ( isNaN( value ) ) {
+			return null;
+		}
+
+		return {
+			value: value,
+			decimals: decPart.length,
+			decimalSep: decimalSep,
+			thousandsSep: thousandsSep,
+			grouped: grouped,
+		};
+	}
+
+	/** Formatteert de tellerwaarde met dezelfde notatie als het origineel. */
+	function formatCounterNumber( value, info ) {
+		var text = info.decimals ? value.toFixed( info.decimals ) : String( Math.round( value ) );
+		var sign = '';
+
+		if ( text.charAt( 0 ) === '-' ) {
+			sign = '-';
+			text = text.slice( 1 );
+		}
+
+		var chunks  = text.split( '.' );
+		var intPart = chunks[ 0 ];
+		var decPart = chunks.length > 1 ? chunks[ 1 ] : '';
+
+		if ( info.grouped ) {
+			var grouped = '';
+			var count   = 0;
+			for ( var i = intPart.length - 1; i >= 0; i-- ) {
+				grouped = intPart.charAt( i ) + grouped;
+				count++;
+				if ( count % 3 === 0 && i > 0 ) {
+					grouped = info.thousandsSep + grouped;
+				}
+			}
+			intPart = grouped;
+		}
+
+		return sign + intPart + ( decPart ? info.decimalSep + decPart : '' );
+	}
+
+	/**
 	 * Animated counter: applies to .szm-gsap-counter (core/heading). Finds the
 	 * first number in the heading's text and counts up from 0 to it, keeping
 	 * any surrounding text (e.g. "500+ klanten", "€ 250") intact.
 	 */
 	function initCounters() {
 		document.querySelectorAll( '.szm-gsap-counter' ).forEach( function ( el ) {
-			var text  = el.textContent;
-			var match = text.match( /[\d.,]+/ );
-			if ( ! match ) {
+			var wrapped = wrapCounterNumber( el );
+			if ( ! wrapped ) {
 				return;
 			}
 
-			var raw    = match[ 0 ];
-			var target = parseFloat( raw.replace( /\./g, '' ).replace( ',', '.' ) );
-			if ( isNaN( target ) ) {
+			var info = parseCounterNumber( wrapped.raw );
+			if ( ! info ) {
 				return;
 			}
 
-			var before   = text.slice( 0, match.index );
-			var after    = text.slice( match.index + raw.length );
-			var speed    = num( el.getAttribute( 'data-szm-counter-speed' ), 1500 ) / 1000;
-			var decimals = ( raw.split( ',' )[ 1 ] || '' ).length;
-			var ease     = gsapEase( el );
-			var loop     = el.getAttribute( 'data-szm-loop' ) !== 'false';
+			var speed = num( el.getAttribute( 'data-szm-counter-speed' ), 1500 ) / 1000;
+			var ease  = gsapEase( el );
+			var loop  = el.getAttribute( 'data-szm-loop' ) !== 'false';
 
 			if ( prefersReducedMotion ) {
 				return;
@@ -903,12 +1057,11 @@
 
 			var counter = { value: 0 };
 			function render() {
-				var formatted = decimals ? counter.value.toFixed( decimals ).replace( '.', ',' ) : Math.round( counter.value ).toString();
-				el.textContent = before + formatted + after;
+				wrapped.span.textContent = formatCounterNumber( counter.value, info );
 			}
 
 			var count = gsap.to( counter, {
-				value: target,
+				value: info.value,
 				duration: speed,
 				ease: ease,
 				onUpdate: render,
@@ -920,11 +1073,14 @@
 				loop: loop && function () {
 					return gsap.timeline( { repeat: -1, delay: loopDelaySeconds( el ), repeatDelay: loopDelaySeconds( el ), paused: true } )
 						.to( counter, { value: 0, duration: speed, ease: ease, onUpdate: render } )
-						.to( counter, { value: target, duration: speed, ease: ease, onUpdate: render } );
+						.to( counter, { value: info.value, duration: speed, ease: ease, onUpdate: render } );
 				},
-				// pause(0) slaat onUpdate over: tekst zelf op 0 zetten.
+				// pause(0) slaat onUpdate over, dus de tekst moet zelf bijgewerkt
+				// worden. Bewust naar de eindwaarde en niet naar 0: anders blijft
+				// er "0+ klanten" in de DOM staan voor schermlezers, crawlers en
+				// screenshots zodra je langs de teller scrolt.
 				onReset: function () {
-					counter.value = 0;
+					counter.value = info.value;
 					render();
 				},
 			} );
