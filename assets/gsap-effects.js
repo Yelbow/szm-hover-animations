@@ -885,6 +885,12 @@
 		new window.IntersectionObserver( function ( entries ) {
 			entries.forEach( function ( entry ) {
 				visible = entry.isIntersecting;
+				// Al (deels) in beeld maar nog onder de 85%-lijn van de
+				// ScrollTrigger (bv. bij laden, of onderaan de pagina): niet
+				// wachten op een scroll.
+				if ( visible ) {
+					play();
+				}
 				if ( loopTl && looping ) {
 					if ( visible ) {
 						loopTl.resume();
@@ -1118,7 +1124,7 @@
 	}
 
 	/**
-	 * Animated counter: applies to .szm-gsap-counter (core/heading). Finds the
+	 * Animated counter: applies to .szm-gsap-counter (core/heading, core/paragraph). Finds the
 	 * first number in the heading's text and counts up from 0 to it, keeping
 	 * any surrounding text (e.g. "500+ klanten", "€ 250") intact.
 	 */
