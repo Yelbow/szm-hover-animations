@@ -398,3 +398,7 @@ als `frontend.js` niet laadt); Marquee+Entrance-combinatie niet live getest.
 ## v1.14.4 — counter ook op Paragraph, entrance-achtige effecten spelen af zodra zichtbaar (2026-09-29)
 - `szm_ha_gsap_counter_blocks` = heading + paragraph (was alleen heading).
 - Bug (verrasjelief /samenwerken/): tekst-reveal/counter/video-reveal startten alleen via ScrollTrigger `top 85%`, dus een blok dat al deels in beeld stond onder die lijn wachtte op een scroll. `entranceReplay` roept nu ook `play()` aan vanuit de IntersectionObserver (threshold 0.1). `played` voorkomt dubbel afspelen; reset na 100vh ongewijzigd.
+
+## Grilling 2026-10-19 (snelle modus, keuzevragen)
+- Oude GSAP-demopagina 199 (/szm-gsap-demo/) op fse-test: Jelle koos "Verwijderen". Nog niet uitgevoerd.
+- Pauze/play-knop op slider /szm-gsap-demo-2/: Jelle koos "Ja, toevoegen". Nog niet gebouwd.
