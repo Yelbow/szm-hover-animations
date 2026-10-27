@@ -487,3 +487,40 @@
 	border-radius: 2px;
 	background: #fff;
 }
+
+/* Kaartenslider (.szm-card-slider): raster tot de grens, daarboven een scroll-snap slider met 3 / 2 / 1 kaarten per beeld. */
+.szm-card-slider-wrapper { position: relative; }
+.szm-card-slider.szm-card-slider--ready {
+	--szm-per-view: 3;
+	--szm-gap: var(--wp--preset--spacing--40, 1.5rem);
+	display: flex !important;
+	flex-wrap: nowrap !important;
+	gap: var(--szm-gap) !important;
+	overflow-x: auto;
+	scroll-snap-type: x mandatory;
+	scrollbar-width: none;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.szm-card-slider.szm-card-slider--ready::-webkit-scrollbar { display: none; }
+.szm-card-slider.szm-card-slider--ready > * {
+	flex: 0 0 calc( ( 100% - var(--szm-gap) * ( var(--szm-per-view) - 1 ) ) / var(--szm-per-view) ) !important;
+	max-width: none !important;
+	scroll-snap-align: start;
+	margin: 0 !important;
+}
+@media ( max-width: 899px ) { .szm-card-slider.szm-card-slider--ready { --szm-per-view: 2; } }
+@media ( max-width: 599px ) { .szm-card-slider.szm-card-slider--ready { --szm-per-view: 1; } }
+.szm-card-slider-arrow {
+	position: absolute; top: 40%; transform: translateY(-50%); z-index: 2;
+	width: 2.5rem; height: 2.5rem; border-radius: 50%; border: 1px solid currentColor;
+	background: var(--wp--preset--color--base, #fff); color: inherit; font-size: 1.5rem; line-height: 1; cursor: pointer;
+	display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.szm-card-slider-prev { left: -1.25rem; }
+.szm-card-slider-next { right: -1.25rem; }
+@media ( max-width: 599px ) { .szm-card-slider-prev { left: 0.25rem; } .szm-card-slider-next { right: 0.25rem; } }
+.szm-card-slider-dots { display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem; }
+.szm-card-slider-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; border: 1px solid currentColor; background: transparent; padding: 0; cursor: pointer; }
+.szm-card-slider-dot.is-active { background: currentColor; }

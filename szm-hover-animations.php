@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SZM Hover Animations
  * Description: Eén "Hover animatie", "Entrance animatie" en "GSAP effect"-paneel per blok in de block-instellingen (site editor) — de GSAP-dropdown toont alleen de effecten die voor dat bloktype gelden en, na kiezen, alleen de bijpassende instellingen (slider/sticky proces-stappen op Columns, accordion/horizontal scroll/full-viewport slides/sticky proces-stappen op Group, video parallax/reveal/play-on-scroll/scrub op Video/Cover, tekst-reveal met SplitText op Heading/Paragraph, animated counter op Heading/Paragraph, magnetic button op Button, infinite marquee op List). Gepinde scroll-effecten corrigeren automatisch voor een sticky header/WP-adminbalk, mogen verticaal centreren i.p.v. vastpinnen tegen de bovenkant, en kunnen optioneel het blok erboven mee laten vastzetten. Tekst-reveal/counter herhalen zichzelf na een instelbare wachttijd zolang ze in beeld blijven. Alles mobiel-getest, allemaal gegraft op bestaande core-blokken — geen nieuwe blokken.
- * Version: 1.14.4
+ * Version: 1.15.0
  * Author: Studio Zonder Meer
  * Text Domain: szm-hover-animations
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SZM_HA_VERSION', '1.14.4' );
+define( 'SZM_HA_VERSION', '1.15.0' );
 define( 'SZM_HA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SZM_HA_URL', plugin_dir_url( __FILE__ ) );
 
@@ -291,6 +291,16 @@ function szm_ha_enqueue_frontend_assets() {
 		true
 	);
 
+	// Kaartenslider (.szm-card-slider): grens en seconden uit Instellingen > Kaartenslider.
+	wp_enqueue_script(
+		'szm-ha-card-slider',
+		SZM_HA_URL . 'assets/card-slider.js',
+		array(),
+		SZM_HA_VERSION,
+		true
+	);
+	wp_add_inline_script( 'szm-ha-card-slider', 'window.szmCardSlider=' . wp_json_encode( szm_ha_card_slider_settings() ) . ';', 'before' );
+
 	// GSAP-module (slider/accordion/video). Vendored locally, geen CDN-afhankelijkheid.
 	// Filterbaar zodat een site die geen van deze effecten gebruikt het kan uitschakelen.
 	if ( apply_filters( 'szm_ha_load_gsap', true ) ) {
@@ -328,6 +338,39 @@ function szm_ha_enqueue_frontend_assets() {
 	}
 }
 add_action( 'wp_enqueue_scripts', 'szm_ha_enqueue_frontend_assets' );
+
+/**
+ * Kaartenslider-instellingen: vanaf hoeveel kaarten een lijst een slider wordt (standaard 3, dus 4 of meer)
+ * en hoeveel seconden een slide blijft staan (0 = niet automatisch). Instellingen > Kaartenslider.
+ */
+function szm_ha_card_slider_settings() {
+	$o = get_option( 'szm_ha_card_slider', array() );
+	return array(
+		'threshold' => isset( $o['threshold'] ) ? max( 1, (int) $o['threshold'] ) : 3,
+		'autoplay'  => isset( $o['autoplay'] ) ? max( 0, (float) $o['autoplay'] ) : 5,
+	);
+}
+add_action( 'admin_init', function () {
+	register_setting( 'szm_ha_card_slider', 'szm_ha_card_slider', array(
+		'sanitize_callback' => function ( $in ) {
+			return array(
+				'threshold' => max( 1, (int) ( $in['threshold'] ?? 3 ) ),
+				'autoplay'  => max( 0, (float) ( $in['autoplay'] ?? 5 ) ),
+			);
+		},
+	) );
+} );
+add_action( 'admin_menu', function () {
+	add_options_page( 'Kaartenslider', 'Kaartenslider', 'manage_options', 'szm-ha-card-slider', function () {
+		$s = szm_ha_card_slider_settings();
+		echo '<div class="wrap"><h1>Kaartenslider</h1><p>Lijsten met de klasse <code>szm-card-slider</code> (bv. de kaartenrijen op de homepage) worden een automatische, klikbare slider zodra ze meer kaarten hebben dan de grens. Daaronder blijft het een gewoon raster. Op mobiel staat er 1 kaart in beeld, op tablet 2, op bureaublad 3.</p><form method="post" action="options.php">';
+		settings_fields( 'szm_ha_card_slider' );
+		echo '<table class="form-table"><tr><th><label for="szm-th">Grens</label></th><td><input id="szm-th" type="number" min="1" name="szm_ha_card_slider[threshold]" value="' . esc_attr( $s['threshold'] ) . '"> <span class="description">Meer kaarten dan dit aantal wordt een slider (standaard 3).</span></td></tr>';
+		echo '<tr><th><label for="szm-ap">Seconden per slide</label></th><td><input id="szm-ap" type="number" min="0" step="0.5" name="szm_ha_card_slider[autoplay]" value="' . esc_attr( $s['autoplay'] ) . '"> <span class="description">0 = niet automatisch doorlopen. Stopt bij hover, aanraken en buiten beeld.</span></td></tr></table>';
+		submit_button();
+		echo '</form></div>';
+	} );
+} );
 
 /**
  * Self-updates through WordPress's native Plugins/Updates screen — no
