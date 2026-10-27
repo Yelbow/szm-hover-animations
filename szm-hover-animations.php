@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SZM Hover Animations
  * Description: Eén "Hover animatie", "Entrance animatie" en "GSAP effect"-paneel per blok in de block-instellingen (site editor) — de GSAP-dropdown toont alleen de effecten die voor dat bloktype gelden en, na kiezen, alleen de bijpassende instellingen (slider/sticky proces-stappen op Columns, accordion/horizontal scroll/full-viewport slides/sticky proces-stappen op Group, video parallax/reveal/play-on-scroll/scrub op Video/Cover, tekst-reveal met SplitText op Heading/Paragraph, animated counter op Heading/Paragraph, magnetic button op Button, infinite marquee op List). Gepinde scroll-effecten corrigeren automatisch voor een sticky header/WP-adminbalk, mogen verticaal centreren i.p.v. vastpinnen tegen de bovenkant, en kunnen optioneel het blok erboven mee laten vastzetten. Tekst-reveal/counter herhalen zichzelf na een instelbare wachttijd zolang ze in beeld blijven. Alles mobiel-getest, allemaal gegraft op bestaande core-blokken — geen nieuwe blokken.
- * Version: 1.15.0
+ * Version: 1.15.1
  * Author: Studio Zonder Meer
  * Text Domain: szm-hover-animations
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SZM_HA_VERSION', '1.15.0' );
+define( 'SZM_HA_VERSION', '1.15.1' );
 define( 'SZM_HA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SZM_HA_URL', plugin_dir_url( __FILE__ ) );
 
@@ -348,6 +348,7 @@ function szm_ha_card_slider_settings() {
 	return array(
 		'threshold' => isset( $o['threshold'] ) ? max( 1, (int) $o['threshold'] ) : 3,
 		'autoplay'  => isset( $o['autoplay'] ) ? max( 0, (float) $o['autoplay'] ) : 5,
+		'speed'     => isset( $o['speed'] ) ? max( 0, (int) $o['speed'] ) : 500,
 	);
 }
 add_action( 'admin_init', function () {
@@ -356,6 +357,7 @@ add_action( 'admin_init', function () {
 			return array(
 				'threshold' => max( 1, (int) ( $in['threshold'] ?? 3 ) ),
 				'autoplay'  => max( 0, (float) ( $in['autoplay'] ?? 5 ) ),
+				'speed'     => max( 0, (int) ( $in['speed'] ?? 500 ) ),
 			);
 		},
 	) );
@@ -363,14 +365,60 @@ add_action( 'admin_init', function () {
 add_action( 'admin_menu', function () {
 	add_options_page( 'Kaartenslider', 'Kaartenslider', 'manage_options', 'szm-ha-card-slider', function () {
 		$s = szm_ha_card_slider_settings();
-		echo '<div class="wrap"><h1>Kaartenslider</h1><p>Lijsten met de klasse <code>szm-card-slider</code> (bv. de kaartenrijen op de homepage) worden een automatische, klikbare slider zodra ze meer kaarten hebben dan de grens. Daaronder blijft het een gewoon raster. Op mobiel staat er 1 kaart in beeld, op tablet 2, op bureaublad 3.</p><form method="post" action="options.php">';
+		echo '<div class="wrap"><h1>Kaartenslider</h1><p>Lijsten (Berichtsjabloon of Rij) waarop in de editor het blokpaneel <strong>Kaartenslider</strong> aanstaat worden een automatische, oneindige slider zodra ze meer kaarten hebben dan de grens. Eén kaart per keer. Daaronder blijft het een gewoon raster. In beeld: 3 kaarten op bureaublad, 2 op tablet, op mobiel 1,25 zodat de volgende kaart uitsteekt. Dit zijn de standaardwaarden, per blok te overschrijven in het blokpaneel.</p><form method="post" action="options.php">';
 		settings_fields( 'szm_ha_card_slider' );
 		echo '<table class="form-table"><tr><th><label for="szm-th">Grens</label></th><td><input id="szm-th" type="number" min="1" name="szm_ha_card_slider[threshold]" value="' . esc_attr( $s['threshold'] ) . '"> <span class="description">Meer kaarten dan dit aantal wordt een slider (standaard 3).</span></td></tr>';
-		echo '<tr><th><label for="szm-ap">Seconden per slide</label></th><td><input id="szm-ap" type="number" min="0" step="0.5" name="szm_ha_card_slider[autoplay]" value="' . esc_attr( $s['autoplay'] ) . '"> <span class="description">0 = niet automatisch doorlopen. Stopt bij hover, aanraken en buiten beeld.</span></td></tr></table>';
+		echo '<tr><th><label for="szm-ap">Seconden per slide</label></th><td><input id="szm-ap" type="number" min="0" step="0.5" name="szm_ha_card_slider[autoplay]" value="' . esc_attr( $s['autoplay'] ) . '"> <span class="description">0 = niet automatisch doorlopen. Stopt bij hover, aanraken en buiten beeld.</span></td></tr>';
+		echo '<tr><th><label for="szm-sp">Overgangssnelheid (ms)</label></th><td><input id="szm-sp" type="number" min="0" step="50" name="szm_ha_card_slider[speed]" value="' . esc_attr( $s['speed'] ) . '"> <span class="description">Hoe lang de beweging naar de volgende kaart duurt (standaard 500).</span></td></tr></table>';
 		submit_button();
 		echo '</form></div>';
 	} );
 } );
+
+/**
+ * Blokpaneel "Kaartenslider" in de editor (alleen beheerders) en server-side toepassen op de website:
+ * een Berichtsjabloon of Groep met attribuut szmSlider krijgt klasse szm-card-slider en de data-attributen.
+ */
+add_action( 'enqueue_block_editor_assets', function () {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	wp_enqueue_script(
+		'szm-ha-card-slider-editor',
+		SZM_HA_URL . 'assets/card-slider-editor.js',
+		array( 'wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-hooks', 'wp-i18n' ),
+		SZM_HA_VERSION,
+		true
+	);
+	wp_add_inline_script(
+		'szm-ha-card-slider-editor',
+		'window.szmCardSliderEditor=' . wp_json_encode( array_merge( szm_ha_card_slider_settings(), array(
+			'canManage'   => true,
+			'settingsUrl' => admin_url( 'options-general.php?page=szm-ha-card-slider' ),
+		) ) ) . ';',
+		'before'
+	);
+} );
+
+function szm_ha_card_slider_toepassen( $html, $block ) {
+	$a = $block['attrs'] ?? array();
+	if ( empty( $a['szmSlider'] ) || '' === $html ) {
+		return $html;
+	}
+	$p = new WP_HTML_Tag_Processor( $html );
+	if ( ! $p->next_tag() ) {
+		return $html;
+	}
+	$p->add_class( 'szm-card-slider' );
+	foreach ( array( 'szmSliderGrens' => 'data-szm-grens', 'szmSliderSeconden' => 'data-szm-seconden', 'szmSliderSnelheid' => 'data-szm-snelheid' ) as $attr => $data ) {
+		if ( isset( $a[ $attr ] ) && '' !== $a[ $attr ] && is_numeric( $a[ $attr ] ) ) {
+			$p->set_attribute( $data, (string) $a[ $attr ] );
+		}
+	}
+	return $p->get_updated_html();
+}
+add_filter( 'render_block_core/post-template', 'szm_ha_card_slider_toepassen', 10, 2 );
+add_filter( 'render_block_core/group', 'szm_ha_card_slider_toepassen', 10, 2 );
 
 /**
  * Self-updates through WordPress's native Plugins/Updates screen — no

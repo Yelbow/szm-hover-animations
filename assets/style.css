@@ -488,30 +488,33 @@
 	background: #fff;
 }
 
-/* Kaartenslider (.szm-card-slider): raster tot de grens, daarboven een scroll-snap slider met 3 / 2 / 1 kaarten per beeld. */
+/* Kaartenslider (.szm-card-slider): raster tot de grens, daarboven een endless slider, 1 kaart per keer.
+   Per beeld: 3 op bureaublad, 2 op tablet, 1,25 op mobiel (de volgende kaart steekt uit zodat je ziet dat er meer is). */
 .szm-card-slider-wrapper { position: relative; }
+.szm-card-slider-viewport { overflow: hidden; touch-action: pan-y; cursor: grab; }
+.szm-card-slider-viewport.is-slepen { cursor: grabbing; user-select: none; }
+.szm-card-slider-viewport img { -webkit-user-drag: none; user-drag: none; }
 .szm-card-slider.szm-card-slider--ready {
 	--szm-per-view: 3;
 	--szm-gap: var(--wp--preset--spacing--40, 1.5rem);
 	display: flex !important;
 	flex-wrap: nowrap !important;
 	gap: var(--szm-gap) !important;
-	overflow-x: auto;
-	scroll-snap-type: x mandatory;
-	scrollbar-width: none;
+	grid-template-columns: none !important;
 	margin: 0;
 	padding: 0;
 	list-style: none;
+	transition: transform var(--szm-speed, 500ms) cubic-bezier(.4, 0, .2, 1);
+	will-change: transform;
 }
-.szm-card-slider.szm-card-slider--ready::-webkit-scrollbar { display: none; }
 .szm-card-slider.szm-card-slider--ready > * {
 	flex: 0 0 calc( ( 100% - var(--szm-gap) * ( var(--szm-per-view) - 1 ) ) / var(--szm-per-view) ) !important;
 	max-width: none !important;
-	scroll-snap-align: start;
 	margin: 0 !important;
+	box-sizing: border-box;
 }
 @media ( max-width: 899px ) { .szm-card-slider.szm-card-slider--ready { --szm-per-view: 2; } }
-@media ( max-width: 599px ) { .szm-card-slider.szm-card-slider--ready { --szm-per-view: 1; } }
+@media ( max-width: 599px ) { .szm-card-slider.szm-card-slider--ready { --szm-per-view: 1.25; --szm-gap: 1rem; } }
 .szm-card-slider-arrow {
 	position: absolute; top: 40%; transform: translateY(-50%); z-index: 2;
 	width: 2.5rem; height: 2.5rem; border-radius: 50%; border: 1px solid currentColor;
@@ -520,7 +523,7 @@
 }
 .szm-card-slider-prev { left: -1.25rem; }
 .szm-card-slider-next { right: -1.25rem; }
-@media ( max-width: 599px ) { .szm-card-slider-prev { left: 0.25rem; } .szm-card-slider-next { right: 0.25rem; } }
-.szm-card-slider-dots { display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem; }
+@media ( max-width: 599px ) { .szm-card-slider-arrow { display: none; } }
+.szm-card-slider-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 1rem; }
 .szm-card-slider-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; border: 1px solid currentColor; background: transparent; padding: 0; cursor: pointer; }
 .szm-card-slider-dot.is-active { background: currentColor; }
