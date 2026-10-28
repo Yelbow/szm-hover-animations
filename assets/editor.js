@@ -481,6 +481,7 @@
 			var showGsapMarquee = isGsapMarqueeSupported( name );
 			var showCardSlider = isCardSliderSupported( name );
 			var cardSliderCfg = window.szmCardSliderEditor || {};
+			var toonSliderPaneel = toonSliderPaneel && !! cardSliderCfg.canManage;
 			// Tekst-reveal en counter staan sinds v1.14.0 in het Entrance-paneel.
 			var showGsapBox = showColumnsFamily || showGroupFamily || showGsapVideo ||
 				showGsapMagnetic || showGsapMarquee;
@@ -603,7 +604,7 @@
 					__( 'Stel hier zelf een animatie in om die voor dit blok te overschrijven.', 'szm-hover-animations' ) )
 			);
 
-			if ( ! showHover && ! showEntrance && ! showGsapBox ) {
+			if ( ! showHover && ! showEntrance && ! showGsapBox && ! toonSliderPaneel ) {
 				return inheritPanel ?
 					el( Fragment, null, el( BlockEdit, props ), el( InspectorControls, null, inheritPanel ) ) :
 					el( BlockEdit, props );
@@ -939,19 +940,19 @@
 							},
 						} )
 					),
-					( showGsapBox || showCardSlider ) && el(
+					( showGsapBox || toonSliderPaneel ) && el(
 						PanelBody,
 						{ title: __( 'Scroll & interactie', 'szm-hover-animations' ), initialOpen: !! attributes.szmSlider },
 
 						// Kaartenslider: dit blok wordt een oneindige slider zodra er
 						// meer kaarten in staan dan de grens.
-						showCardSlider && el( ToggleControl, {
+						toonSliderPaneel && el( ToggleControl, {
 							label: __( 'Kaartenslider (oneindig doorbladeren)', 'szm-hover-animations' ),
 							help: __( 'Staan er meer kaartjes in dit blok dan de grens, dan wordt het op de website een slider met pijltjes, bolletjes en vegen. Eén kaart per keer, na de laatste komt de eerste. Hier in de editor blijft het een gewone lijst.', 'szm-hover-animations' ),
 							checked: !! attributes.szmSlider,
 							onChange: function ( value ) { setAttributes( { szmSlider: value } ); },
 						} ),
-						showCardSlider && !! attributes.szmSlider && el( 'div', { style: { display: 'grid', gap: '12px', margin: '12px 0' } },
+						toonSliderPaneel && !! attributes.szmSlider && el( 'div', { style: { display: 'grid', gap: '12px', margin: '12px 0' } },
 							el( TextControl, {
 								type: 'number', min: 0, label: __( 'Grens (aantal kaarten)', 'szm-hover-animations' ),
 								help: __( 'Meer kaartjes dan dit en het wordt een slider. Leeg = standaard.', 'szm-hover-animations' ),
