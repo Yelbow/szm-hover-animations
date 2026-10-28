@@ -1464,6 +1464,45 @@
 	 */
 	var ONZE_PANELEN = [ 'Hover animatie', 'Entrance animatie', 'Scroll & interactie', 'Animatie via ouder-blok' ];
 
+	// De hulptekst verschijnt in een laag die aan <body> hangt, niet in het
+	// paneel zelf: het zijpaneel van de editor scrolt en knipt af, waardoor een
+	// tooltip die erin zit aan de rechterkant werd afgekapt (Jelle 28-10).
+	var zwevendeTip = null;
+	function tipLaag() {
+		if ( ! zwevendeTip ) {
+			zwevendeTip = document.createElement( 'div' );
+			zwevendeTip.className = 'szm-ha-info-float';
+			zwevendeTip.setAttribute( 'role', 'tooltip' );
+			document.body.appendChild( zwevendeTip );
+		}
+		return zwevendeTip;
+	}
+	function toonTip( anker, tekst ) {
+		var laag = tipLaag();
+		laag.textContent = tekst;
+		var r = anker.getBoundingClientRect();
+		var breedte = Math.max( 180, Math.min( 260, window.innerWidth - 24 ) );
+		laag.style.width = breedte + 'px';
+		laag.style.left = Math.round( Math.min( Math.max( 12, r.left - 14 ), window.innerWidth - breedte - 12 ) ) + 'px';
+		// Past hij niet onder het icoontje, dan klapt hij erboven.
+		laag.style.top = '';
+		laag.style.bottom = '';
+		var hoogte = laag.offsetHeight || 60;
+		if ( r.bottom + 10 + hoogte > window.innerHeight ) {
+			laag.style.top = Math.round( Math.max( 12, r.top - 10 - hoogte ) ) + 'px';
+		} else {
+			laag.style.top = Math.round( r.bottom + 10 ) + 'px';
+		}
+		laag.classList.add( 'is-zichtbaar' );
+	}
+	function verbergTip() {
+		if ( zwevendeTip ) {
+			zwevendeTip.classList.remove( 'is-zichtbaar' );
+		}
+	}
+	window.addEventListener( 'scroll', verbergTip, true );
+	window.addEventListener( 'resize', verbergTip );
+
 	function verstopHelp() {
 		document.querySelectorAll( '.components-panel__body' ).forEach( function ( paneel ) {
 			var titel = paneel.querySelector( '.components-panel__body-title' );
@@ -1494,12 +1533,12 @@
 				ico.setAttribute( 'aria-hidden', 'true' );
 				ico.textContent = 'i';
 
-				var tekstblok = document.createElement( 'span' );
-				tekstblok.className = 'szm-ha-info__tip';
-				tekstblok.textContent = tekst;
-
 				tip.appendChild( ico );
-				tip.appendChild( tekstblok );
+				tip.addEventListener( 'mouseenter', function () { toonTip( tip, tekst ); } );
+				tip.addEventListener( 'mouseleave', verbergTip );
+				tip.addEventListener( 'focus', function () { toonTip( tip, tekst ); } );
+				tip.addEventListener( 'blur', verbergTip );
+				tip.addEventListener( 'click', function ( e ) { e.preventDefault(); toonTip( tip, tekst ); } );
 				label.appendChild( tip );
 			} );
 		} );

@@ -589,13 +589,13 @@
 }
 .szm-ha-info:hover .szm-ha-info__icon,
 .szm-ha-info:focus .szm-ha-info__icon { opacity: 1; }
-.szm-ha-info__tip {
-	display: none;
-	position: absolute;
-	left: 50%;
-	top: 150%;
-	transform: translateX(-50%);
-	width: 250px;
+/* De hulptekst zelf staat in een laag aan <body> (position: fixed), zodat het
+   scrollende zijpaneel van de editor hem niet kan afkappen. */
+.szm-ha-info-float {
+	position: fixed;
+	z-index: 100000;
+	box-sizing: border-box;
+	max-width: calc( 100vw - 24px );
 	padding: 0.5rem 0.6rem;
 	background: #1e1e1e;
 	color: #fff;
@@ -606,9 +606,9 @@
 	letter-spacing: 0;
 	text-transform: none;
 	text-align: left;
-	z-index: 100000;
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+	box-shadow: 0 4px 12px rgba( 0, 0, 0, 0.3 );
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.12s ease;
 }
-.szm-ha-info:hover .szm-ha-info__tip,
-.szm-ha-info:focus .szm-ha-info__tip,
-.szm-ha-info:focus-within .szm-ha-info__tip { display: block; }
+.szm-ha-info-float.is-zichtbaar { opacity: 1; }
