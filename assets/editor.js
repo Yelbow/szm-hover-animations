@@ -362,6 +362,10 @@
 			extra.szmSliderGrens    = { type: 'number' };
 			extra.szmSliderSeconden = { type: 'number' };
 			extra.szmSliderSnelheid = { type: 'number' };
+			// Mobiel: kaartbreedte in % (leeg = 80) en ruimte tot de schermrand
+			// in px (leeg = 0, de rij loopt dan door tot de schermrand).
+			extra.szmSliderMobiel   = { type: 'number' };
+			extra.szmSliderRand     = { type: 'number' };
 			// Automatisch doorschuiven staat standaard aan (Jelle 28-10).
 			extra.szmSliderAutoplay = { type: 'boolean', default: true };
 			extra.szmSliderLoop     = { type: 'boolean', default: true };
@@ -731,6 +735,31 @@
 						min: 1,
 						max: 20,
 						step: 1,
+					} ),
+					// Mobiel: hoe breed een kaart is en hoeveel lucht er tussen
+					// kaart en schermrand zit. Samen bepalen die twee of het
+					// voelt als een rij die links en rechts doorloopt.
+					el( RangeControl, {
+						label: __( 'Kaartbreedte op mobiel (%)', 'szm-hover-animations' ),
+						help: __( '80 = de kaart vult 80% van het scherm, de volgende kaart steekt dan uit.', 'szm-hover-animations' ),
+						value: attributes.szmSliderMobiel || 80,
+						onChange: function ( value ) {
+							setAttributes( { szmSliderMobiel: value } );
+						},
+						min: 60,
+						max: 100,
+						step: 5,
+					} ),
+					el( RangeControl, {
+						label: __( 'Ruimte tot de schermrand op mobiel (px)', 'szm-hover-animations' ),
+						help: __( '0 = de kaarten lopen door tot de schermrand en worden daar afgesneden; hoger = lucht tussen kaart en schermrand.', 'szm-hover-animations' ),
+						value: typeof attributes.szmSliderRand === 'number' ? attributes.szmSliderRand : 0,
+						onChange: function ( value ) {
+							setAttributes( { szmSliderRand: value } );
+						},
+						min: 0,
+						max: 48,
+						step: 4,
 					} )
 				);
 			}

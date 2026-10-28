@@ -41,6 +41,14 @@
 		if ( perbeeld > 0 ) {
 			list.style.setProperty( '--szm-perbeeld', perbeeld );
 		}
+		// Mobiel: kaartbreedte in procenten (80 = 1,25 kaart per beeld) en de
+		// ruimte tot de schermrand. Samen geven die het gevoel dat de rij links
+		// en rechts doorloopt (Jelle 28-10).
+		var mobielPct = num( list.getAttribute( 'data-szm-mobiel' ), 80 );
+		if ( mobielPct > 0 ) {
+			list.style.setProperty( '--szm-mobiel-per-view', ( 100 / Math.min( 100, Math.max( 40, mobielPct ) ) ).toFixed( 4 ) );
+		}
+		var rand = num( list.getAttribute( 'data-szm-rand' ), 0 );
 		var K = loop ? 4 : 0; // kopieën aan elk uiteinde, genoeg voor 3 in beeld plus het uitstekende kaartje
 
 		// Eigen klasse op elk kind: WordPress zet op smalle schermen
@@ -113,11 +121,20 @@
 		}
 		// Ruimte tussen de tekstkolom en de schermrand: die mag de slider gebruiken.
 		function zetBleed( links, rechts ) {
-			// Uit (Jelle 28-10): de slider houdt overal de breedte van de container aan,
-			// op mobiel met de padding van de sectie ervoor. Geen bleed dus.
-			links = 0; rechts = 0;
-			links = Math.min( Math.max( 0, links ), 200 );
-			rechts = Math.min( Math.max( 0, rechts ), 200 );
+			// Desktop en tablet: de slider houdt de breedte van de container aan.
+			// Mobiel: de rij loopt door tot de schermrand, met 'rand' px lucht,
+			// zodat de kaarten door de schermrand worden afgesneden in plaats van
+			// door de padding van de sectie. Dat geeft het gevoel dat de rij links
+			// en rechts doorloopt (Jelle 28-10).
+			if ( window.innerWidth > 599 ) {
+				links = 0;
+				rechts = 0;
+			} else {
+				links = Math.max( 0, links - rand );
+				rechts = Math.max( 0, rechts - rand );
+			}
+			links = Math.min( links, 200 );
+			rechts = Math.min( rechts, 200 );
 			outer.style.setProperty( '--szm-bleed-l', links + 'px' );
 			outer.style.setProperty( '--szm-bleed-r', rechts + 'px' );
 			outer.classList.toggle( 'szm-card-slider-wrapper--bleed', links > 1 || rechts > 1 );
