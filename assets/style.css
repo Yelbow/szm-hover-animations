@@ -550,7 +550,7 @@
    plaatsing) of helemaal uit te zetten (Jelle 28-10). */
 .szm-card-slider-wrapper { --szm-pijl-grootte: 36px; }
 .szm-card-slider-arrow {
-	position: absolute; top: 50%; transform: translateY(-50%); z-index: 3;
+	position: absolute; top: var( --szm-pijl-top, 50% ); transform: translateY(-50%); z-index: 3;
 	width: var( --szm-pijl-grootte ); height: var( --szm-pijl-grootte );
 	border: 0; border-radius: 50%; background: transparent; color: inherit;
 	font-size: calc( var( --szm-pijl-grootte ) * 0.62 ); line-height: 1;

@@ -173,6 +173,25 @@
 				);
 			}
 		}
+		// Pijltjes horen naast het beeld te staan, niet naast de titel eronder.
+		// Kaarten zonder afbeelding (of met alleen een klein logo) houden het
+		// midden van de kaart aan (Jelle 28-10).
+		function zetPijlTop() {
+			var kaart = items[ 0 ];
+			if ( ! kaart ) { return; }
+			var kr = kaart.getBoundingClientRect();
+			var hr = outer.getBoundingClientRect();
+			var midden = kr.top - hr.top + kr.height / 2;
+			var img = kaart.querySelector( 'img' );
+			if ( img ) {
+				var ir = img.getBoundingClientRect();
+				if ( ir.height && ir.height >= kr.height * 0.4 ) {
+					midden = ir.top - hr.top + ir.height / 2;
+				}
+			}
+			outer.style.setProperty( '--szm-pijl-top', Math.round( midden ) + 'px' );
+		}
+
 		function zet( x, animeer ) {
 			list.style.transition = animeer && speed > 0 && ! reduced ? '' : 'none';
 			list.style.transform = 'translate3d(' + x + 'px,0,0)';
@@ -298,11 +317,16 @@
 			var b = viewport.clientWidth;
 			if ( b === laatsteBreedte ) { return; }
 			laatsteBreedte = b;
-			meet(); window.clearTimeout( vangnet ); bezig = false; zet( basis( idx ), false );
+			meet(); window.clearTimeout( vangnet ); bezig = false; zet( basis( idx ), false ); zetPijlTop();
 		}
 		if ( 'ResizeObserver' in window ) { new ResizeObserver( pasAan ).observe( viewport ); } else { window.addEventListener( 'resize', pasAan ); }
 		window.addEventListener( 'resize', herberekenBleed );
-		meet(); go( 0, false );
+		meet(); go( 0, false ); zetPijlTop();
+		// Afbeeldingen hebben pas na het laden hun hoogte; daarna de pijl nog
+		// eens op het beeldmidden zetten.
+		if ( document.readyState !== 'complete' ) {
+			window.addEventListener( 'load', zetPijlTop );
+		}
 	}
 
 	function run() { document.querySelectorAll( '.szm-card-slider' ).forEach( init ); }
