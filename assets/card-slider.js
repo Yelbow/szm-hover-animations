@@ -122,15 +122,15 @@
 		// Ruimte tussen de tekstkolom en de schermrand: die mag de slider gebruiken.
 		function zetBleed( links, rechts ) {
 			// Desktop en tablet: de slider houdt de breedte van de container aan.
-			// Mobiel: de rij loopt door tot de schermrand, met 'rand' px lucht,
-			// zodat de kaarten door de schermrand worden afgesneden in plaats van
-			// door de padding van de sectie. Dat geeft het gevoel dat de rij links
-			// en rechts doorloopt (Jelle 28-10).
+			// Mobiel: links blijft de padding van de sectie staan (de eerste kaart
+			// lijnt uit met de tekst), rechts loopt de rij door tot de schermrand,
+			// met 'rand' px lucht. Zo wordt de volgende kaart door de schermrand
+			// afgesneden en lijkt de rij door te lopen (Jelle 28-10).
 			if ( window.innerWidth > 599 ) {
 				links = 0;
 				rechts = 0;
 			} else {
-				links = Math.max( 0, links - rand );
+				links = 0;
 				rechts = Math.max( 0, rechts - rand );
 			}
 			links = Math.min( links, 200 );

@@ -752,7 +752,7 @@
 					} ),
 					el( RangeControl, {
 						label: __( 'Ruimte tot de schermrand op mobiel (px)', 'szm-hover-animations' ),
-						help: __( '0 = de kaarten lopen door tot de schermrand en worden daar afgesneden; hoger = lucht tussen kaart en schermrand.', 'szm-hover-animations' ),
+						help: __( '0 = de rij loopt rechts door tot de schermrand en wordt daar afgesneden; hoger = lucht tussen de rij en de schermrand. Links blijft de padding van de sectie staan.', 'szm-hover-animations' ),
 						value: typeof attributes.szmSliderRand === 'number' ? attributes.szmSliderRand : 0,
 						onChange: function ( value ) {
 							setAttributes( { szmSliderRand: value } );
