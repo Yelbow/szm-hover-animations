@@ -88,10 +88,9 @@
 		}
 		// Ruimte tussen de tekstkolom en de schermrand: die mag de slider gebruiken.
 		function zetBleed( links, rechts ) {
-			// Alleen op mobiel: daar moet de zijkant-padding weg zodat de kaarten tot de
-			// schermrand lopen. Op bureaublad blijven de kaarten op de tekstkolom uitgelijnd
-			// (feedback Jelle 28-10).
-			if ( window.innerWidth > 781 ) { links = 0; rechts = 0; }
+			// Uit (Jelle 28-10): de slider houdt overal de breedte van de container aan,
+			// op mobiel met de padding van de sectie ervoor. Geen bleed dus.
+			links = 0; rechts = 0;
 			links = Math.min( Math.max( 0, links ), 200 );
 			rechts = Math.min( Math.max( 0, rechts ), 200 );
 			outer.style.setProperty( '--szm-bleed-l', links + 'px' );
