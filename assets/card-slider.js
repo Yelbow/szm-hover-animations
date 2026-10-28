@@ -23,7 +23,10 @@
 
 	function num( v, d ) { var x = parseFloat( v ); return isNaN( x ) ? d : x; }
 
+	var rijTeller = 0; // hoeveelste slider op deze pagina, voor de timing-stagger
+
 	function init( list ) {
+		var mijnRij = rijTeller++;
 		var items = Array.prototype.filter.call( list.children, function ( c ) { return c.nodeType === 1; } );
 		var n = items.length;
 		var grens = num( list.getAttribute( 'data-szm-grens' ), cfg.threshold );
@@ -199,12 +202,25 @@
 		function start() {
 			if ( reduced || seconds <= 0 || timer ) { return; }
 			if ( ! loop && idx >= n - 1 ) { return; }
-			timer = window.setInterval( function () {
+			// Kleine vertraging per slider, zodat meerdere sliders op één pagina
+			// niet exact gelijk opklikken (Jelle 28-10). Hooguit 1,8s verschil.
+			var uitstel = Math.min( mijnRij * 450, 1800 );
+			timer = window.setTimeout( function () {
 				if ( ! loop && idx >= n - 1 ) { stop(); return; }
 				go( idx + 1, true );
-			}, seconds * 1000 );
+				timer = window.setInterval( function () {
+					if ( ! loop && idx >= n - 1 ) { stop(); return; }
+					go( idx + 1, true );
+				}, seconds * 1000 );
+			}, seconds * 1000 + uitstel );
 		}
-		function stop() { if ( timer ) { window.clearInterval( timer ); timer = null; } }
+		function stop() {
+			if ( timer ) {
+				window.clearTimeout( timer );
+				window.clearInterval( timer );
+				timer = null;
+			}
+		}
 
 		prev.addEventListener( 'click', function () { stop(); go( idx - 1, true ); } );
 		next.addEventListener( 'click', function () { stop(); go( idx + 1, true ); } );
