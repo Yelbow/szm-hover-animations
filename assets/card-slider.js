@@ -52,6 +52,13 @@
 			list.style.setProperty( '--szm-mobiel-per-view', ( 100 / Math.min( 100, Math.max( 40, mobielPct ) ) ).toFixed( 4 ) );
 		}
 		var rand = num( list.getAttribute( 'data-szm-rand' ), 0 );
+		// Pijltjes (Jelle 28-10): minimalistisch naast de rij, per blok aan te
+		// passen in stijl, grootte en plaatsing, of helemaal uit te zetten.
+		var toonPijlen  = list.getAttribute( 'data-szm-pijlen' ) !== '0';
+		var pijlStijl   = list.getAttribute( 'data-szm-pijlstijl' ) || 'minimaal';
+		var pijlGrootte = num( list.getAttribute( 'data-szm-pijlgrootte' ), 36 );
+		var pijlPlaats  = list.getAttribute( 'data-szm-pijlplaats' ) === 'over' ? 'over' : 'buiten';
+		pijlGrootte = Math.max( 24, Math.min( 64, pijlGrootte ) );
 		var K = loop ? 4 : 0; // kopieën aan elk uiteinde, genoeg voor 3 in beeld plus het uitstekende kaartje
 
 		// Eigen klasse op elk kind: WordPress zet op smalle schermen
@@ -72,7 +79,11 @@
 		outer.appendChild( viewport );
 		viewport.appendChild( list );
 		list.classList.add( 'szm-card-slider--ready' );
+		outer.classList.add( 'szm-card-slider-wrapper--pijl-' + pijlStijl );
+		outer.classList.add( 'szm-card-slider-wrapper--pijl-' + pijlPlaats );
+		outer.style.setProperty( '--szm-pijl-grootte', pijlGrootte + 'px' );
 		zetBleed( Math.max( 0, Math.round( beginStand.left ) ), Math.max( 0, Math.round( window.innerWidth - beginStand.right ) ) );
+		herberekenBleed();
 		list.style.setProperty( '--szm-speed', ( reduced ? 0 : speed ) + 'ms' );
 		list.style.transitionTimingFunction = EASE_CSS[ ease ] || EASE_CSS.smooth;
 		outer.setAttribute( 'role', 'region' );
@@ -106,6 +117,7 @@
 		}
 		var prev = knop( 'szm-card-slider-arrow szm-card-slider-prev', 'Vorige', '&#8249;' );
 		var next = knop( 'szm-card-slider-arrow szm-card-slider-next', 'Volgende', '&#8250;' );
+		if ( ! toonPijlen ) { prev.hidden = true; next.hidden = true; }
 		var dotsWrap = document.createElement( 'div' );
 		dotsWrap.className = 'szm-card-slider-dots';
 		outer.appendChild( prev ); outer.appendChild( next ); outer.appendChild( dotsWrap );
@@ -150,6 +162,16 @@
 			var links = r.left + ( parseFloat( cs.borderLeftWidth ) || 0 ) + ( parseFloat( cs.paddingLeft ) || 0 );
 			var binnen = p.clientWidth - ( parseFloat( cs.paddingLeft ) || 0 ) - ( parseFloat( cs.paddingRight ) || 0 );
 			zetBleed( links, window.innerWidth - ( links + binnen ) );
+			// Pijltjes horen naast de rij, niet over de kaarten. Is daar geen
+			// ruimte (smalle sectie, groot pijltje), dan vallen ze erover met een
+			// eigen achtergrond zodat ze leesbaar blijven (Jelle 28-10).
+			if ( toonPijlen ) {
+				var nodig = pijlGrootte + 16;
+				outer.classList.toggle(
+					'szm-card-slider-wrapper--pijl-krap',
+					'buiten' === pijlPlaats && ( links < nodig || window.innerWidth - ( links + binnen ) < nodig )
+				);
+			}
 		}
 		function zet( x, animeer ) {
 			list.style.transition = animeer && speed > 0 && ! reduced ? '' : 'none';

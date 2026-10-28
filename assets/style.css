@@ -545,17 +545,52 @@
    Staat er een vast aantal per beeld op het blok (Kolommen: 1), dan wint dat. */
 @media ( max-width: 899px ) { .szm-card-slider.szm-card-slider--ready { --szm-per-view: min( 2, var( --szm-perbeeld, 2 ) ); } }
 @media ( max-width: 599px ) { .szm-card-slider.szm-card-slider--ready { --szm-per-view: min( var( --szm-mobiel-per-view, 1.25 ), var( --szm-perbeeld, 99 ) ); } }
+/* Pijltjes: standaard minimalistisch, naast de rij in plaats van over de
+   kaarten, en zonder gevulde knop. Per blok in te stellen (stijl, grootte,
+   plaatsing) of helemaal uit te zetten (Jelle 28-10). */
+.szm-card-slider-wrapper { --szm-pijl-grootte: 36px; }
 .szm-card-slider-arrow {
-	position: absolute; top: 40%; transform: translateY(-50%); z-index: 2;
-	width: 2.5rem; height: 2.5rem; border-radius: 50%; border: 1px solid currentColor;
-	background: var(--wp--preset--color--base, #fff); color: inherit; font-size: 1.5rem; line-height: 1; cursor: pointer;
+	position: absolute; top: 50%; transform: translateY(-50%); z-index: 3;
+	width: var( --szm-pijl-grootte ); height: var( --szm-pijl-grootte );
+	border: 0; border-radius: 50%; background: transparent; color: inherit;
+	font-size: calc( var( --szm-pijl-grootte ) * 0.62 ); line-height: 1;
 	display: flex; align-items: center; justify-content: center; padding: 0;
+	cursor: pointer; opacity: 0.55;
+	transition: opacity 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
 }
-.szm-card-slider-prev { left: calc( var( --szm-bleed-l, 0px ) - 1.25rem ); }
-.szm-card-slider-next { right: calc( var( --szm-bleed-r, 0px ) - 1.25rem ); }
+.szm-card-slider-arrow:hover,
+.szm-card-slider-arrow:focus-visible { opacity: 1; transform: translateY(-50%) scale(1.06); }
+/* Buiten de kaarten: het pijltje staat naast de rij, in de marge van de sectie. */
+.szm-card-slider-wrapper--pijl-buiten .szm-card-slider-prev { left: calc( var( --szm-bleed-l, 0px ) - var( --szm-pijl-grootte ) - 0.75rem ); }
+.szm-card-slider-wrapper--pijl-buiten .szm-card-slider-next { right: calc( var( --szm-bleed-r, 0px ) - var( --szm-pijl-grootte ) - 0.75rem ); }
+/* Over de kaarten (gekozen), of automatisch als er naast de rij geen ruimte is. */
+.szm-card-slider-wrapper--pijl-over .szm-card-slider-prev,
+.szm-card-slider-wrapper--pijl-krap .szm-card-slider-prev { left: 0.5rem; }
+.szm-card-slider-wrapper--pijl-over .szm-card-slider-next,
+.szm-card-slider-wrapper--pijl-krap .szm-card-slider-next { right: calc( var( --szm-bleed-r, 0px ) + 0.5rem ); }
+.szm-card-slider-wrapper--pijl-over .szm-card-slider-arrow,
+.szm-card-slider-wrapper--pijl-krap .szm-card-slider-arrow {
+	background: var( --wp--preset--color--base, #fff );
+	box-shadow: 0 1px 6px rgba( 0, 0, 0, 0.15 );
+	opacity: 0.9;
+}
+/* Stijl "rand": dunne cirkel, geen vulling. */
+.szm-card-slider-wrapper--pijl-rand .szm-card-slider-arrow {
+	border: 1px solid currentColor;
+	background: var( --wp--preset--color--base, #fff );
+}
+/* Stijl "gevuld": donkere cirkel met licht pijltje. */
+.szm-card-slider-wrapper--pijl-gevuld .szm-card-slider-arrow {
+	background: var( --wp--preset--color--contrast, #111 );
+	color: var( --wp--preset--color--base, #fff );
+	opacity: 0.85;
+}
 /* Loop uit: aan het begin/eind is er geen volgende of vorige kaart meer. */
 .szm-card-slider-arrow.is-uit,
-.szm-card-slider-arrow:disabled { opacity: 0.35; cursor: default; }
+.szm-card-slider-arrow:disabled { opacity: 0.25; cursor: default; }
+.szm-card-slider-arrow.is-uit:hover,
+.szm-card-slider-arrow:disabled:hover { transform: translateY(-50%); }
+.szm-card-slider-arrow[hidden] { display: none; }
 @media ( max-width: 599px ) { .szm-card-slider-arrow { display: none; } }
 .szm-card-slider-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 1rem; }
 .szm-card-slider-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; border: 1px solid currentColor; background: transparent; padding: 0; cursor: pointer; }

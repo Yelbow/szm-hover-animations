@@ -495,6 +495,11 @@ function szm_ha_effect_data( $effect, array $a, $context = 'group' ) {
 		// Mobiel: kaartbreedte in % en de ruimte tot de schermrand (Jelle 28-10).
 		$d['data-szm-mobiel']   = $nummer( 'szmSliderMobiel' );
 		$d['data-szm-rand']     = $nummer( 'szmSliderRand' );
+		// Pijltjes (Jelle 28-10): aan/uit, stijl, grootte en plaatsing.
+		$d['data-szm-pijlen']      = $vlag( 'szmSliderPijlen', true );
+		$d['data-szm-pijlstijl']   = $tekst( 'szmSliderPijlStijl', 'minimaal' );
+		$d['data-szm-pijlgrootte'] = $nummer( 'szmSliderPijlGrootte' );
+		$d['data-szm-pijlplaats']  = $tekst( 'szmSliderPijlPlaats', 'buiten' );
 		// Automatisch doorschuiven staat standaard aan (Jelle 28-10).
 		$d['data-szm-autoplay'] = $vlag( 'szmSliderAutoplay', true );
 		$d['data-szm-loop']     = $vlag( 'szmSliderLoop', true );

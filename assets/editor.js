@@ -366,6 +366,12 @@
 			// in px (leeg = 0, de rij loopt dan door tot de schermrand).
 			extra.szmSliderMobiel   = { type: 'number' };
 			extra.szmSliderRand     = { type: 'number' };
+			// Pijltjes: aan/uit, stijl (minimaal, rand, gevuld), grootte in px en
+			// plaatsing (buiten de kaarten of erover).
+			extra.szmSliderPijlen      = { type: 'boolean', default: true };
+			extra.szmSliderPijlStijl   = { type: 'string' };
+			extra.szmSliderPijlGrootte = { type: 'number' };
+			extra.szmSliderPijlPlaats  = { type: 'string' };
 			// Automatisch doorschuiven staat standaard aan (Jelle 28-10).
 			extra.szmSliderAutoplay = { type: 'boolean', default: true };
 			extra.szmSliderLoop     = { type: 'boolean', default: true };
@@ -760,6 +766,49 @@
 						min: 0,
 						max: 48,
 						step: 4,
+					} ),
+					// Pijltjes: minimalistisch naast de rij is de stand, aan te
+					// passen of uit te zetten (Jelle 28-10).
+					el( ToggleControl, {
+						label: __( 'Pijltjes tonen', 'szm-hover-animations' ),
+						checked: attributes.szmSliderPijlen !== false,
+						onChange: function ( value ) {
+							setAttributes( { szmSliderPijlen: value } );
+						},
+					} ),
+					attributes.szmSliderPijlen !== false && el( SelectControl, {
+						label: __( 'Stijl van de pijltjes', 'szm-hover-animations' ),
+						value: attributes.szmSliderPijlStijl || 'minimaal',
+						options: [
+							{ label: __( 'Minimaal (alleen het pijltje)', 'szm-hover-animations' ), value: 'minimaal' },
+							{ label: __( 'Rand (dunne cirkel)', 'szm-hover-animations' ), value: 'rand' },
+							{ label: __( 'Gevuld (donkere cirkel)', 'szm-hover-animations' ), value: 'gevuld' },
+						],
+						onChange: function ( value ) {
+							setAttributes( { szmSliderPijlStijl: value } );
+						},
+					} ),
+					attributes.szmSliderPijlen !== false && el( RangeControl, {
+						label: __( 'Grootte van de pijltjes (px)', 'szm-hover-animations' ),
+						value: attributes.szmSliderPijlGrootte || 36,
+						onChange: function ( value ) {
+							setAttributes( { szmSliderPijlGrootte: value } );
+						},
+						min: 24,
+						max: 64,
+						step: 4,
+					} ),
+					attributes.szmSliderPijlen !== false && el( SelectControl, {
+						label: __( 'Waar staan de pijltjes', 'szm-hover-animations' ),
+						help: __( 'Naast de kaarten is de rustige stand. Is er naast de rij geen ruimte, dan vallen ze over de kaarten met een lichte achtergrond.', 'szm-hover-animations' ),
+						value: attributes.szmSliderPijlPlaats || 'buiten',
+						options: [
+							{ label: __( 'Naast de kaarten', 'szm-hover-animations' ), value: 'buiten' },
+							{ label: __( 'Over de kaarten', 'szm-hover-animations' ), value: 'over' },
+						],
+						onChange: function ( value ) {
+							setAttributes( { szmSliderPijlPlaats: value } );
+						},
 					} )
 				);
 			}
