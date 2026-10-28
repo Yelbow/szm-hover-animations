@@ -14,6 +14,7 @@
 	var SelectControl           = wp.components.SelectControl;
 	var RangeControl            = wp.components.RangeControl;
 	var ToggleControl           = wp.components.ToggleControl;
+	var TextControl             = wp.components.TextControl;
 	var Button                  = wp.components.Button;
 	var Notice                  = wp.components.Notice;
 	var __                      = wp.i18n.__;
