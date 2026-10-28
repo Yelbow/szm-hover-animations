@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SZM Hover Animations
  * Description: Eén "Hover animatie", "Entrance animatie" en "GSAP effect"-paneel per blok in de block-instellingen (site editor) — de GSAP-dropdown toont alleen de effecten die voor dat bloktype gelden en, na kiezen, alleen de bijpassende instellingen (slider/sticky proces-stappen op Columns, accordion/horizontal scroll/full-viewport slides/sticky proces-stappen op Group, video parallax/reveal/play-on-scroll/scrub op Video/Cover, tekst-reveal met SplitText op Heading/Paragraph, animated counter op Heading/Paragraph, magnetic button op Button, infinite marquee op List). Gepinde scroll-effecten corrigeren automatisch voor een sticky header/WP-adminbalk, mogen verticaal centreren i.p.v. vastpinnen tegen de bovenkant, en kunnen optioneel het blok erboven mee laten vastzetten. Tekst-reveal/counter herhalen zichzelf na een instelbare wachttijd zolang ze in beeld blijven. Alles mobiel-getest, allemaal gegraft op bestaande core-blokken — geen nieuwe blokken.
- * Version: 1.15.1
+ * Version: 1.16.0
  * Author: Studio Zonder Meer
  * Text Domain: szm-hover-animations
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SZM_HA_VERSION', '1.15.1' );
+define( 'SZM_HA_VERSION', '1.16.0' );
 define( 'SZM_HA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SZM_HA_URL', plugin_dir_url( __FILE__ ) );
 
@@ -400,14 +400,24 @@ add_action( 'enqueue_block_editor_assets', function () {
 	);
 } );
 
-function szm_ha_card_slider_toepassen( $html, $block ) {
-	$a = $block['attrs'] ?? array();
-	if ( empty( $a['szmSlider'] ) || '' === $html ) {
-		return $html;
-	}
+function szm_ha_card_slider_klasse( string $html, array $a, bool $binnenin = false ): string {
 	$p = new WP_HTML_Tag_Processor( $html );
 	if ( ! $p->next_tag() ) {
 		return $html;
+	}
+	if ( $binnenin ) {
+		// Query Loop: de slider hoort op de lijst met berichten (post-template), niet op de wrapper eromheen.
+		$gevonden = false;
+		while ( $p->next_tag() ) {
+			$klassen = (string) $p->get_attribute( 'class' );
+			if ( $klassen !== '' && str_contains( $klassen, 'wp-block-post-template' ) ) {
+				$gevonden = true;
+				break;
+			}
+		}
+		if ( ! $gevonden ) {
+			return $html;
+		}
 	}
 	$p->add_class( 'szm-card-slider' );
 	foreach ( array( 'szmSliderGrens' => 'data-szm-grens', 'szmSliderSeconden' => 'data-szm-seconden', 'szmSliderSnelheid' => 'data-szm-snelheid' ) as $attr => $data ) {
@@ -417,8 +427,25 @@ function szm_ha_card_slider_toepassen( $html, $block ) {
 	}
 	return $p->get_updated_html();
 }
+
+function szm_ha_card_slider_toepassen( $html, $block ) {
+	$a = $block['attrs'] ?? array();
+	if ( empty( $a['szmSlider'] ) || '' === $html ) {
+		return $html;
+	}
+	return szm_ha_card_slider_klasse( (string) $html, $a );
+}
 add_filter( 'render_block_core/post-template', 'szm_ha_card_slider_toepassen', 10, 2 );
 add_filter( 'render_block_core/group', 'szm_ha_card_slider_toepassen', 10, 2 );
+
+/** Query Loop met szmSlider: de klasse gaat naar de berichtenlijst binnenin. */
+add_filter( 'render_block_core/query', function ( $html, $block ) {
+	$a = $block['attrs'] ?? array();
+	if ( empty( $a['szmSlider'] ) || '' === $html ) {
+		return $html;
+	}
+	return szm_ha_card_slider_klasse( (string) $html, $a, true );
+}, 10, 2 );
 
 /**
  * Self-updates through WordPress's native Plugins/Updates screen — no

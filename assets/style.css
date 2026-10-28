@@ -491,6 +491,11 @@
 /* Kaartenslider (.szm-card-slider): raster tot de grens, daarboven een endless slider, 1 kaart per keer.
    Per beeld: 3 op bureaublad, 2 op tablet, 1,25 op mobiel (de volgende kaart steekt uit zodat je ziet dat er meer is). */
 .szm-card-slider-wrapper { position: relative; }
+/* De slider loopt door tot de rand van het scherm, terwijl de eerste kaart op de
+   tekstkolom blijft uitgelijnd. Zo wordt een half zichtbare kaart door de schermrand
+   afgesneden en niet door de padding van de sectie (feedback Jelle 27-10). */
+.szm-card-slider-wrapper--bleed { margin-left: calc( -1 * var( --szm-bleed-l, 0px ) ); margin-right: calc( -1 * var( --szm-bleed-r, 0px ) ); }
+.szm-card-slider-wrapper--bleed .szm-card-slider.szm-card-slider--ready { padding-left: var( --szm-bleed-l, 0px ); padding-right: var( --szm-bleed-r, 0px ); }
 .szm-card-slider-viewport { overflow: hidden; touch-action: pan-y; cursor: grab; }
 .szm-card-slider-viewport.is-slepen { cursor: grabbing; user-select: none; }
 .szm-card-slider-viewport img { -webkit-user-drag: none; user-drag: none; }
@@ -521,8 +526,8 @@
 	background: var(--wp--preset--color--base, #fff); color: inherit; font-size: 1.5rem; line-height: 1; cursor: pointer;
 	display: flex; align-items: center; justify-content: center; padding: 0;
 }
-.szm-card-slider-prev { left: -1.25rem; }
-.szm-card-slider-next { right: -1.25rem; }
+.szm-card-slider-prev { left: calc( var( --szm-bleed-l, 0px ) - 1.25rem ); }
+.szm-card-slider-next { right: calc( var( --szm-bleed-r, 0px ) - 1.25rem ); }
 @media ( max-width: 599px ) { .szm-card-slider-arrow { display: none; } }
 .szm-card-slider-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 1rem; }
 .szm-card-slider-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; border: 1px solid currentColor; background: transparent; padding: 0; cursor: pointer; }

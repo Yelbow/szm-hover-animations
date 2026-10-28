@@ -29,10 +29,15 @@
 		outer.className = 'szm-card-slider-wrapper';
 		var viewport = document.createElement( 'div' );
 		viewport.className = 'szm-card-slider-viewport';
+		// Vóór het ombouwen meten waar de kaartjes nu staan: dat is de afstand tot de
+		// schermrand, en die ruimte mag de slider gebruiken (bleed) zodat een half
+		// zichtbare kaart door de schermrand wordt afgesneden en niet door de padding.
+		var start = list.getBoundingClientRect();
 		list.parentNode.insertBefore( outer, list );
 		outer.appendChild( viewport );
 		viewport.appendChild( list );
 		list.classList.add( 'szm-card-slider--ready' );
+		zetBleed( Math.max( 0, Math.round( start.left ) ), Math.max( 0, Math.round( window.innerWidth - start.right ) ) );
 		list.style.setProperty( '--szm-speed', ( reduced ? 0 : speed ) + 'ms' );
 		outer.setAttribute( 'role', 'region' );
 		outer.setAttribute( 'aria-roledescription', 'carrousel' );
@@ -56,6 +61,7 @@
 
 		// Geen native slepen van links en afbeeldingen, dat onderbreekt het slepen met de muis.
 		Array.prototype.forEach.call( list.querySelectorAll( 'a, img' ), function ( x ) { x.setAttribute( 'draggable', 'false' ); } );
+		list.addEventListener( 'dragstart', function ( e ) { e.preventDefault(); } );
 
 		function knop( cls, label, html ) {
 			var b = document.createElement( 'button' );
@@ -79,6 +85,23 @@
 		function meet() {
 			var gap = parseFloat( getComputedStyle( list ).columnGap ) || 0;
 			step = items[ 0 ].getBoundingClientRect().width + gap;
+		}
+		// Ruimte tussen de tekstkolom en de schermrand: die mag de slider gebruiken.
+		function zetBleed( links, rechts ) {
+			links = Math.min( Math.max( 0, links ), 200 );
+			rechts = Math.min( Math.max( 0, rechts ), 200 );
+			outer.style.setProperty( '--szm-bleed-l', links + 'px' );
+			outer.style.setProperty( '--szm-bleed-r', rechts + 'px' );
+			outer.classList.toggle( 'szm-card-slider-wrapper--bleed', links > 1 || rechts > 1 );
+		}
+		function herberekenBleed() {
+			var p = outer.parentNode;
+			if ( ! p ) { return; }
+			var cs = getComputedStyle( p );
+			var r = p.getBoundingClientRect();
+			var links = r.left + ( parseFloat( cs.borderLeftWidth ) || 0 ) + ( parseFloat( cs.paddingLeft ) || 0 );
+			var binnen = p.clientWidth - ( parseFloat( cs.paddingLeft ) || 0 ) - ( parseFloat( cs.paddingRight ) || 0 );
+			zetBleed( links, window.innerWidth - ( links + binnen ) );
 		}
 		function zet( x, animeer ) {
 			list.style.transition = animeer && speed > 0 && ! reduced ? '' : 'none';
@@ -172,6 +195,7 @@
 			meet(); window.clearTimeout( vangnet ); bezig = false; zet( basis( idx ), false );
 		}
 		if ( 'ResizeObserver' in window ) { new ResizeObserver( pasAan ).observe( viewport ); } else { window.addEventListener( 'resize', pasAan ); }
+		window.addEventListener( 'resize', herberekenBleed );
 		meet(); go( 0, false );
 	}
 

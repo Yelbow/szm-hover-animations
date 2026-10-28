@@ -91,6 +91,13 @@
 	var DEFAULT_LOOP_DELAY       = 'normal';
 	var DEFAULT_PROCESS_SCROLL_LENGTH = 100; // % van schermhoogte per stap
 
+	// Kaartenslider (v1.16.0): dezelfde instellingen als voorheen, maar in het
+	// paneel "Scroll & interactie" en op het blok dat de bezoeker ook aanklikt
+	// (de Query Loop zelf, of de Rij/Groep met de kaartjes).
+	function isCardSliderSupported( name ) {
+		return name === 'core/query' || name === 'core/group';
+	}
+
 	function isHoverSupported( name ) {
 		return HOVER_BLOCKS.indexOf( name ) !== -1;
 	}
@@ -419,6 +426,13 @@
 			extra.szmGsapFullpage = { type: 'boolean', default: false };
 		}
 
+		if ( isCardSliderSupported( name ) ) {
+			extra.szmSlider           = { type: 'boolean', default: false };
+			extra.szmSliderGrens      = { type: 'string', default: '' };
+			extra.szmSliderSeconden   = { type: 'string', default: '' };
+			extra.szmSliderSnelheid   = { type: 'string', default: '' };
+		}
+
 		if ( isGsapMarqueeSupported( name ) ) {
 			extra.szmGsapMarquee          = { type: 'boolean', default: false };
 			extra.szmGsapMarqueeSpeed     = { type: 'number', default: DEFAULT_MARQUEE_SPEED };
@@ -464,6 +478,8 @@
 			var showGsapCounter = isGsapCounterSupported( name );
 			var showGsapMagnetic = isGsapMagneticSupported( name );
 			var showGsapMarquee = isGsapMarqueeSupported( name );
+			var showCardSlider = isCardSliderSupported( name );
+			var cardSliderCfg = window.szmCardSliderEditor || {};
 			// Tekst-reveal en counter staan sinds v1.14.0 in het Entrance-paneel.
 			var showGsapBox = showColumnsFamily || showGroupFamily || showGsapVideo ||
 				showGsapMagnetic || showGsapMarquee;
@@ -922,9 +938,43 @@
 							},
 						} )
 					),
-					showGsapBox && el(
+					( showGsapBox || showCardSlider ) && el(
 						PanelBody,
-						{ title: __( 'Scroll & interactie', 'szm-hover-animations' ), initialOpen: false },
+						{ title: __( 'Scroll & interactie', 'szm-hover-animations' ), initialOpen: !! attributes.szmSlider },
+
+						// Kaartenslider: dit blok wordt een oneindige slider zodra er
+						// meer kaarten in staan dan de grens.
+						showCardSlider && el( ToggleControl, {
+							label: __( 'Kaartenslider (oneindig doorbladeren)', 'szm-hover-animations' ),
+							help: __( 'Staan er meer kaartjes in dit blok dan de grens, dan wordt het op de website een slider met pijltjes, bolletjes en vegen. Eén kaart per keer, na de laatste komt de eerste. Hier in de editor blijft het een gewone lijst.', 'szm-hover-animations' ),
+							checked: !! attributes.szmSlider,
+							onChange: function ( value ) { setAttributes( { szmSlider: value } ); },
+						} ),
+						showCardSlider && !! attributes.szmSlider && el( 'div', { style: { display: 'grid', gap: '12px', margin: '12px 0' } },
+							el( TextControl, {
+								type: 'number', min: 0, label: __( 'Grens (aantal kaarten)', 'szm-hover-animations' ),
+								help: __( 'Meer kaartjes dan dit en het wordt een slider. Leeg = standaard.', 'szm-hover-animations' ),
+								placeholder: String( cardSliderCfg.threshold || 3 ), value: attributes.szmSliderGrens || '',
+								__nextHasNoMarginBottom: true, __next40pxDefaultSize: true,
+								onChange: function ( value ) { setAttributes( { szmSliderGrens: value } ); },
+							} ),
+							el( TextControl, {
+								type: 'number', min: 0, label: __( 'Seconden per kaart', 'szm-hover-animations' ),
+								help: __( 'Automatisch doorgaan. 0 = niet automatisch, leeg = standaard.', 'szm-hover-animations' ),
+								placeholder: String( cardSliderCfg.autoplay || 5 ), value: attributes.szmSliderSeconden || '',
+								__nextHasNoMarginBottom: true, __next40pxDefaultSize: true,
+								onChange: function ( value ) { setAttributes( { szmSliderSeconden: value } ); },
+							} ),
+							el( TextControl, {
+								type: 'number', min: 0, label: __( 'Overgangssnelheid (ms)', 'szm-hover-animations' ),
+								help: __( 'Hoe snel de kaarten verschuiven. Leeg = standaard.', 'szm-hover-animations' ),
+								placeholder: String( cardSliderCfg.speed || 500 ), value: attributes.szmSliderSnelheid || '',
+								__nextHasNoMarginBottom: true, __next40pxDefaultSize: true,
+								onChange: function ( value ) { setAttributes( { szmSliderSnelheid: value } ); },
+							} ),
+							cardSliderCfg.settingsUrl ? el( 'a', { href: cardSliderCfg.settingsUrl }, __( 'Standaardwaarden: Instellingen > Kaartenslider', 'szm-hover-animations' ) ) : null
+						),
+
 						positionNotice,
 
 						// core/columns: slider of sticky proces-stappen.
