@@ -14,6 +14,7 @@
 	var SelectControl           = wp.components.SelectControl;
 	var RangeControl            = wp.components.RangeControl;
 	var ToggleControl           = wp.components.ToggleControl;
+	var TextControl             = wp.components.TextControl;
 	var Button                  = wp.components.Button;
 	var Notice                  = wp.components.Notice;
 	var __                      = wp.i18n.__;
@@ -340,11 +341,19 @@
 		// per effect. De oude attributes hieronder blijven geregistreerd zodat
 		// al opgeslagen content (met alleen de oude attributes) precies blijft
 		// werken via de legacy-fallback in withAnimationControls/addSaveProps.
-		if ( columnsFamily || groupFamily ) {
+		if ( columnsFamily || groupFamily || name === 'core/query' ) {
 			extra.szmGsapEffect = { type: 'string', default: '' };
 			// Sticky proces-stappen: scroll-afstand per stap (nu ook relevant voor
 			// Group, niet alleen Columns, sinds process ook daar kan).
 			extra.szmGsapProcessScrollLength = { type: 'number', default: DEFAULT_PROCESS_SCROLL_LENGTH };
+		}
+
+		// Kaartenslider: een optie in de Effect-dropdown van "Scroll & interactie".
+		if ( name === 'core/query' || groupFamily ) {
+			extra.szmSlider         = { type: 'boolean', default: false };
+			extra.szmSliderGrens    = { type: 'string', default: '' };
+			extra.szmSliderSeconden = { type: 'string', default: '' };
+			extra.szmSliderSnelheid = { type: 'string', default: '' };
 		}
 		if ( columnsFamily || groupFamily || videoFamily ) {
 			// Wanneer een gepind scroll-effect begint met pinnen (los van de
@@ -465,8 +474,9 @@
 			var showGsapMagnetic = isGsapMagneticSupported( name );
 			var showGsapMarquee = isGsapMarqueeSupported( name );
 			// Tekst-reveal en counter staan sinds v1.14.0 in het Entrance-paneel.
+			var isQueryBlock  = name === 'core/query';
 			var showGsapBox = showColumnsFamily || showGroupFamily || showGsapVideo ||
-				showGsapMagnetic || showGsapMarquee;
+				showGsapMagnetic || showGsapMarquee || isQueryBlock;
 
 			// Entrance-dropdown: CSS-entrances + (per bloktype) de GSAP-entrances.
 			// Opslag blijft in de eigen attributes (szmGsapText, szmGsapVideoEffect),
@@ -599,7 +609,9 @@
 			// szmGsapEffect-attribute als dat al is aangeraakt, anders afgeleid
 			// uit de oude losse toggles (zie legacyColumnsEffect/legacyGroupEffect).
 			var columnsEffect = showColumnsFamily ? ( attributes.szmGsapEffect || legacyColumnsEffect( attributes ) ) : '';
-			var groupEffect    = showGroupFamily ? ( attributes.szmGsapEffect || legacyGroupEffect( attributes ) ) : '';
+			var groupEffect    = ( showGroupFamily || isQueryBlock )
+				? ( attributes.szmGsapEffect || ( attributes.szmSlider ? 'cardslider' : legacyGroupEffect( attributes ) ) )
+				: '';
 
 			function handleColumnsEffectChange( value ) {
 				// Zet de oude toggles altijd expliciet uit zodra de nieuwe dropdown
@@ -618,6 +630,9 @@
 					szmGsapAccordion: false,
 					szmGsapHorizontal: false,
 					szmGsapFullpage: false,
+					// De kaartenslider werkt op de bestaande szmSlider-attributen (die de
+					// website al gebruikt), dus de dropdown zet die mee aan en uit.
+					szmSlider: value === 'cardslider',
 				} );
 			}
 
@@ -980,17 +995,19 @@
 						),
 
 						// core/group: accordion, horizontal scroll of full-viewport slides.
-						showGroupFamily && el( SelectControl, {
+						( showGroupFamily || isQueryBlock ) && el( SelectControl, {
 							label: __( 'Effect', 'szm-hover-animations' ),
 							value: groupEffect,
-							options: mapToOptions( GSAP_GROUP_OPTIONS_MAP ),
+							options: isQueryBlock
+								? mapToOptions( { '': __( 'Geen', 'szm-hover-animations' ), cardslider: __( 'Kaartenslider (oneindig doorbladeren)', 'szm-hover-animations' ) } )
+								: mapToOptions( GSAP_GROUP_OPTIONS_MAP ),
 							onChange: handleGroupEffectChange,
 							// Horizontaal scrollen en full-viewport slides pinnen; accordion
 							// zet een eigen wrapper om de kinderen. Geen van drieën samen met
 							// een anker.
 							disabled: positionConflict,
 						} ),
-						showGroupFamily && previewFor( groupEffect && 'group-' + groupEffect ),
+						( showGroupFamily || isQueryBlock ) && previewFor( groupEffect && 'group-' + groupEffect ),
 						showGroupFamily && groupEffect === 'accordion' && el( RangeControl, {
 							label: __( 'Snelheid (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapAccordionSpeed || DEFAULT_ACCORDION_SPEED,
@@ -1043,6 +1060,29 @@
 						showGroupFamily && groupEffect === 'fullpage' && lockHeadingControl(),
 						showGroupFamily && groupEffect === 'fullpage' && el( 'p', { className: 'components-base-control__help' },
 							__( 'Elk direct kind-blok wordt een volledig-scherm paneel; scrollen wisselt naar het volgende paneel volgens de gekozen overgangsstijl. Begint altijd direct bovenaan (geen "wanneer begint pinnen"-keuze) — anders past het paneel niet meer op het volledige scherm. Niet live zichtbaar in de editor.', 'szm-hover-animations' )
+						),
+						( showGroupFamily || isQueryBlock ) && groupEffect === 'cardslider' && el( 'div', { style: { display: 'grid', gap: '12px', margin: '12px 0' } },
+							el( TextControl, {
+								type: 'number', min: 0, label: __( 'Grens (aantal kaarten)', 'szm-hover-animations' ),
+								help: __( 'Meer kaartjes dan dit en het wordt een slider. Leeg = standaard.', 'szm-hover-animations' ),
+								placeholder: '3', value: attributes.szmSliderGrens || '',
+								__nextHasNoMarginBottom: true, __next40pxDefaultSize: true,
+								onChange: function ( value ) { setAttributes( { szmSliderGrens: value } ); },
+							} ),
+							el( TextControl, {
+								type: 'number', min: 0, label: __( 'Seconden per kaart', 'szm-hover-animations' ),
+								help: __( 'Automatisch doorgaan. 0 = niet automatisch. Leeg = standaard.', 'szm-hover-animations' ),
+								placeholder: '5', value: attributes.szmSliderSeconden || '',
+								__nextHasNoMarginBottom: true, __next40pxDefaultSize: true,
+								onChange: function ( value ) { setAttributes( { szmSliderSeconden: value } ); },
+							} ),
+							el( TextControl, {
+								type: 'number', min: 0, label: __( 'Overgangssnelheid (ms)', 'szm-hover-animations' ),
+								help: __( 'Hoe snel de kaarten verschuiven. Leeg = standaard.', 'szm-hover-animations' ),
+								placeholder: '500', value: attributes.szmSliderSnelheid || '',
+								__nextHasNoMarginBottom: true, __next40pxDefaultSize: true,
+								onChange: function ( value ) { setAttributes( { szmSliderSnelheid: value } ); },
+							} )
 						),
 						showGroupFamily && groupEffect === 'process' && pinStartControl(),
 						showGroupFamily && groupEffect === 'process' && processScrollLengthControl(),
