@@ -495,7 +495,7 @@
    tekstkolom blijft uitgelijnd. Zo wordt een half zichtbare kaart door de schermrand
    afgesneden en niet door de padding van de sectie (feedback Jelle 27-10). */
 .szm-card-slider-wrapper--bleed { margin-left: calc( -1 * var( --szm-bleed-l, 0px ) ); margin-right: calc( -1 * var( --szm-bleed-r, 0px ) ); }
-.szm-card-slider-wrapper--bleed .szm-card-slider.szm-card-slider--ready { padding-left: var( --szm-bleed-l, 0px ); padding-right: var( --szm-bleed-r, 0px ); }
+.szm-card-slider-wrapper--bleed .szm-card-slider.szm-card-slider--ready { padding-left: 0; padding-right: 0; }
 .szm-card-slider-viewport { overflow: hidden; touch-action: pan-y; cursor: grab; }
 .szm-card-slider-viewport.is-slepen { cursor: grabbing; user-select: none; }
 .szm-card-slider-viewport img { -webkit-user-drag: none; user-drag: none; }
