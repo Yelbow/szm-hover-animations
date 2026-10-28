@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SZM Hover Animations
  * Description: Eén "Hover animatie", "Entrance animatie" en "GSAP effect"-paneel per blok in de block-instellingen (site editor) — de GSAP-dropdown toont alleen de effecten die voor dat bloktype gelden en, na kiezen, alleen de bijpassende instellingen (slider/sticky proces-stappen op Columns, accordion/horizontal scroll/full-viewport slides/sticky proces-stappen op Group, video parallax/reveal/play-on-scroll/scrub op Video/Cover, tekst-reveal met SplitText op Heading/Paragraph, animated counter op Heading/Paragraph, magnetic button op Button, infinite marquee op List). Gepinde scroll-effecten corrigeren automatisch voor een sticky header/WP-adminbalk, mogen verticaal centreren i.p.v. vastpinnen tegen de bovenkant, en kunnen optioneel het blok erboven mee laten vastzetten. Tekst-reveal/counter herhalen zichzelf na een instelbare wachttijd zolang ze in beeld blijven. Alles mobiel-getest, allemaal gegraft op bestaande core-blokken — geen nieuwe blokken.
- * Version: 1.17.2
+ * Version: 1.18.0
  * Author: Studio Zonder Meer
  * Text Domain: szm-hover-animations
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SZM_HA_VERSION', '1.17.2' );
+define( 'SZM_HA_VERSION', '1.18.0' );
 define( 'SZM_HA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SZM_HA_URL', plugin_dir_url( __FILE__ ) );
 
@@ -78,31 +78,30 @@ function szm_ha_get_gsap_text_effects() {
 }
 
 /**
- * Welke GSAP-effecten beschikbaar zijn voor een core/columns-blok. Eén
- * dropdown i.p.v. losse aan/uit-toggles per effect — sluiten elkaar toch al
- * uit (zie addSaveProps in editor.js).
+ * Welke GSAP-effecten de "Scroll & interactie"-dropdown toont. Sinds v1.18.0
+ * één lijst voor Kolommen, Rij én Query Loop: Jelle (28-10) wil overal
+ * dezelfde opties met dezelfde instellingen, niet per bloktype een uitgeklede
+ * variant. value = opgeslagen attribute-waarde; 'slider' = de kaartenslider-
+ * motor die nu op alle drie de bloktypes draait.
  */
-function szm_ha_get_gsap_columns_effects() {
+function szm_ha_get_gsap_effect_options() {
 	return array(
-		''        => __( 'Geen', 'szm-hover-animations' ),
-		'slider'  => __( 'Slider', 'szm-hover-animations' ),
-		'process' => __( 'Sticky proces-stappen', 'szm-hover-animations' ),
+		''           => __( 'Geen', 'szm-hover-animations' ),
+		'slider'     => __( 'Slider', 'szm-hover-animations' ),
+		'accordion'  => __( 'Accordion', 'szm-hover-animations' ),
+		'horizontal' => __( 'Horizontal scroll', 'szm-hover-animations' ),
+		'fullpage'   => __( 'Full-viewport scroll slides', 'szm-hover-animations' ),
+		'process'    => __( 'Sticky proces-stappen', 'szm-hover-animations' ),
 	);
 }
 
-/**
- * Welke GSAP-effecten beschikbaar zijn voor een core/group-blok. Zelfde
- * reden als hierboven: al mutually exclusive, dus één dropdown.
- */
+/** Terugval-namen: bestaande aanroepen/localisatie blijven werken. */
+function szm_ha_get_gsap_columns_effects() {
+	return szm_ha_get_gsap_effect_options();
+}
+
 function szm_ha_get_gsap_group_effects() {
-	return array(
-		''            => __( 'Geen', 'szm-hover-animations' ),
-		'accordion'   => __( 'Accordion', 'szm-hover-animations' ),
-		'horizontal'  => __( 'Horizontal scroll', 'szm-hover-animations' ),
-		'fullpage'    => __( 'Full-viewport scroll slides', 'szm-hover-animations' ),
-		'process'     => __( 'Sticky proces-stappen', 'szm-hover-animations' ),
-		'cardslider'  => __( 'Kaartenslider (oneindig doorbladeren)', 'szm-hover-animations' ),
-	);
+	return szm_ha_get_gsap_effect_options();
 }
 
 /**
@@ -251,6 +250,8 @@ function szm_ha_enqueue_editor_assets() {
 			// aan/uit-toggles per effect, zie SPEC "1 box in de site editor").
 			'gsapColumnsOptions' => szm_ha_get_gsap_columns_effects(),
 			'gsapGroupOptions'   => szm_ha_get_gsap_group_effects(),
+			// Eén lijst voor Kolommen, Rij en Query Loop (v1.18.0).
+			'gsapEffectOptions'  => szm_ha_get_gsap_effect_options(),
 			'easingOptions'      => szm_ha_get_easing_presets(),
 			'pinStartOptions'    => szm_ha_get_pin_start_presets(),
 			'loopDelayOptions'   => szm_ha_get_loop_delay_presets(),
@@ -401,17 +402,154 @@ add_action( 'enqueue_block_editor_assets', function () {
 	);
 } );
 
-function szm_ha_card_slider_klasse( string $html, array $a, bool $binnenin = false ): string {
+/**
+ * Welk effect er op dit blok gekozen is, met terugval op de oude losse
+ * aan/uit-toggles (content van vóór v1.9.0) en op het oude szmSlider-vinkje
+ * (1.15/1.16). 'cardslider' was de v1.17-naam van dezelfde motor als 'slider'.
+ */
+function szm_ha_effect_van_blok( array $a ) {
+	$e = isset( $a['szmGsapEffect'] ) ? (string) $a['szmGsapEffect'] : '';
+	if ( 'cardslider' === $e ) {
+		$e = 'slider';
+	}
+	if ( '' !== $e ) {
+		return $e;
+	}
+	if ( ! empty( $a['szmGsapSlider'] ) || ! empty( $a['szmSlider'] ) ) {
+		return 'slider';
+	}
+	if ( ! empty( $a['szmGsapProcess'] ) ) {
+		return 'process';
+	}
+	if ( ! empty( $a['szmGsapAccordion'] ) ) {
+		return 'accordion';
+	}
+	if ( ! empty( $a['szmGsapHorizontal'] ) ) {
+		return 'horizontal';
+	}
+	if ( ! empty( $a['szmGsapFullpage'] ) ) {
+		return 'fullpage';
+	}
+	return '';
+}
+
+/** Klasse die bij het effect hoort (de slider gebruikt de kaartenslider-motor). */
+function szm_ha_effect_klasse( $effect ) {
+	switch ( $effect ) {
+		case 'slider':
+			return 'szm-card-slider';
+		case 'accordion':
+			return 'szm-gsap-accordion';
+		case 'horizontal':
+			return 'szm-gsap-horizontal';
+		case 'fullpage':
+			return 'szm-gsap-fullpage';
+		case 'process':
+			return 'szm-gsap-process';
+	}
+	return '';
+}
+
+/**
+ * data-attributen voor de slider, met dezelfde namen als addSaveProps in
+ * editor.js. Lege waarde = attribuut overslaan, dan geldt de standaard
+ * (CSS-staffel of Instellingen > Kaartenslider).
+ *
+ * Kolommen: standaard één kolom per beeld en de slider doet het altijd (die
+ * kies je ten slotte zelf). Rij en Query Loop houden 3 per beeld en de grens
+ * uit de instellingen, want daar bepaalt het aantal kaarten of het een slider
+ * wordt (Liesbeth: 4 of meer kaarten = slider).
+ */
+function szm_ha_effect_data( $effect, array $a, $context = 'group' ) {
+	$d = array();
+	$nummer = function ( $key, $standaard = null ) use ( $a ) {
+		if ( isset( $a[ $key ] ) && '' !== $a[ $key ] && is_numeric( $a[ $key ] ) ) {
+			return (string) $a[ $key ];
+		}
+		return null === $standaard ? '' : (string) $standaard;
+	};
+	$vlag = function ( $key, $standaard = false ) use ( $a ) {
+		if ( isset( $a[ $key ] ) ) {
+			return $a[ $key ] ? '1' : '0';
+		}
+		return $standaard ? '1' : '0';
+	};
+	$tekst = function ( $key, $standaard = '' ) use ( $a ) {
+		return ( isset( $a[ $key ] ) && '' !== $a[ $key ] ) ? (string) $a[ $key ] : $standaard;
+	};
+
+	if ( 'slider' === $effect ) {
+		$perbeeld = $nummer( 'szmSliderPerBeeld' );
+		if ( '' === $perbeeld && 'columns' === $context ) {
+			$perbeeld = '1';
+		}
+		$d['data-szm-perbeeld'] = $perbeeld;
+
+		$grens = $nummer( 'szmSliderGrens' );
+		if ( '' === $grens && 'query' !== $context ) {
+			$grens = '0';
+		}
+		$d['data-szm-grens']    = $grens;
+		$d['data-szm-seconden'] = $nummer( 'szmSliderSeconden' );
+		$d['data-szm-snelheid'] = $nummer( 'szmSliderSnelheid' );
+		// Automatisch doorschuiven staat standaard aan (Jelle 28-10).
+		$d['data-szm-autoplay'] = $vlag( 'szmSliderAutoplay', true );
+		$d['data-szm-loop']     = $vlag( 'szmSliderLoop', true );
+		$d['data-szm-ease']     = $tekst( 'szmGsapEasing', 'smooth' );
+		return $d;
+	}
+
+	if ( 'accordion' === $effect ) {
+		$d['data-szm-accordion-speed']        = $nummer( 'szmGsapAccordionSpeed', 400 );
+		$d['data-szm-accordion-multiple']     = $vlag( 'szmGsapAccordionMultiple' );
+		$d['data-szm-accordion-default-open'] = $nummer( 'szmGsapAccordionDefaultOpen', -1 );
+		$d['data-szm-ease']                   = $tekst( 'szmGsapEasing', 'smooth' );
+		return $d;
+	}
+
+	if ( 'horizontal' === $effect ) {
+		$d['data-szm-pin-start']       = $tekst( 'szmGsapPinStart', 'top' );
+		$d['data-szm-horizontal-mode'] = $tekst( 'szmGsapHorizontalMode', 'scroll' );
+		$d['data-szm-lock-heading']    = $vlag( 'szmGsapLockHeading' );
+		$d['data-szm-vertical-center'] = $vlag( 'szmGsapVerticalCenter' );
+		return $d;
+	}
+
+	if ( 'fullpage' === $effect ) {
+		$d['data-szm-fullpage-transition'] = $tekst( 'szmGsapFullpageTransition', 'fade' );
+		$d['data-szm-lock-heading']        = $vlag( 'szmGsapLockHeading' );
+		return $d;
+	}
+
+	if ( 'process' === $effect ) {
+		$d['data-szm-pin-start']       = $tekst( 'szmGsapPinStart', 'top' );
+		$d['data-szm-scroll-length']   = $nummer( 'szmGsapProcessScrollLength', 100 );
+		$d['data-szm-lock-heading']    = $vlag( 'szmGsapLockHeading' );
+		$d['data-szm-vertical-center'] = $vlag( 'szmGsapVerticalCenter' );
+		return $d;
+	}
+
+	return $d;
+}
+
+/**
+ * Zet een klasse + data-attributen op de eerste tag van de blok-html. Met
+ * $binnenin zoekt hij de lijst met berichten (post-template) binnen een Query
+ * Loop, zodat de kaarten de kinderen van het effect zijn en niet de wrapper.
+ */
+function szm_ha_effect_html( $html, $klasse, array $data, $binnenin = false ) {
+	if ( '' === $html || '' === $klasse ) {
+		return $html;
+	}
 	$p = new WP_HTML_Tag_Processor( $html );
 	if ( ! $p->next_tag() ) {
 		return $html;
 	}
 	if ( $binnenin ) {
-		// Query Loop: de slider hoort op de lijst met berichten (post-template), niet op de wrapper eromheen.
 		$gevonden = false;
 		while ( $p->next_tag() ) {
 			$klassen = (string) $p->get_attribute( 'class' );
-			if ( $klassen !== '' && str_contains( $klassen, 'wp-block-post-template' ) ) {
+			if ( '' !== $klassen && str_contains( $klassen, 'wp-block-post-template' ) ) {
 				$gevonden = true;
 				break;
 			}
@@ -420,32 +558,59 @@ function szm_ha_card_slider_klasse( string $html, array $a, bool $binnenin = fal
 			return $html;
 		}
 	}
-	$p->add_class( 'szm-card-slider' );
-	foreach ( array( 'szmSliderGrens' => 'data-szm-grens', 'szmSliderSeconden' => 'data-szm-seconden', 'szmSliderSnelheid' => 'data-szm-snelheid' ) as $attr => $data ) {
-		if ( isset( $a[ $attr ] ) && '' !== $a[ $attr ] && is_numeric( $a[ $attr ] ) ) {
-			$p->set_attribute( $data, (string) $a[ $attr ] );
+	$p->add_class( $klasse );
+	foreach ( $data as $naam => $waarde ) {
+		if ( '' !== $waarde ) {
+			$p->set_attribute( $naam, $waarde );
 		}
 	}
 	return $p->get_updated_html();
 }
 
-function szm_ha_card_slider_toepassen( $html, $block ) {
-	$a = $block['attrs'] ?? array();
-	if ( empty( $a['szmSlider'] ) || '' === $html ) {
+/**
+ * Server-side toepassen van het gekozen effect.
+ * - Kolommen en Rij: alleen de slider, want de andere effecten zetten hun
+ *   klasse al in de opgeslagen blok-markup (addSaveProps). Dat scheelt
+ *   block-recovery op al gepubliceerde blokken.
+ * - Query Loop: alles hier, want daar staat niets in de opgeslagen markup, en
+ *   de klasse hoort op de berichtenlijst binnenin.
+ */
+function szm_ha_effect_toepassen( $html, $block, $context = 'group' ) {
+	if ( '' === $html ) {
 		return $html;
 	}
-	return szm_ha_card_slider_klasse( (string) $html, $a );
+	$a      = isset( $block['attrs'] ) ? (array) $block['attrs'] : array();
+	$effect = szm_ha_effect_van_blok( $a );
+	if ( '' === $effect ) {
+		return $html;
+	}
+	if ( 'query' !== $context && 'slider' !== $effect ) {
+		return $html;
+	}
+	return szm_ha_effect_html(
+		(string) $html,
+		szm_ha_effect_klasse( $effect ),
+		szm_ha_effect_data( $effect, $a, $context ),
+		'query' === $context
+	);
 }
-add_filter( 'render_block_core/post-template', 'szm_ha_card_slider_toepassen', 10, 2 );
-add_filter( 'render_block_core/group', 'szm_ha_card_slider_toepassen', 10, 2 );
-
-/** Query Loop met szmSlider: de klasse gaat naar de berichtenlijst binnenin. */
+add_filter( 'render_block_core/columns', function ( $html, $block ) {
+	return szm_ha_effect_toepassen( $html, $block, 'columns' );
+}, 10, 2 );
+add_filter( 'render_block_core/group', function ( $html, $block ) {
+	return szm_ha_effect_toepassen( $html, $block, 'group' );
+}, 10, 2 );
 add_filter( 'render_block_core/query', function ( $html, $block ) {
-	$a = $block['attrs'] ?? array();
+	return szm_ha_effect_toepassen( $html, $block, 'query' );
+}, 10, 2 );
+
+/** Oude content: het szmSlider-vinkje staat op het Berichtsjabloon zelf. */
+add_filter( 'render_block_core/post-template', function ( $html, $block ) {
+	$a = isset( $block['attrs'] ) ? (array) $block['attrs'] : array();
 	if ( empty( $a['szmSlider'] ) || '' === $html ) {
 		return $html;
 	}
-	return szm_ha_card_slider_klasse( (string) $html, $a, true );
+	return szm_ha_effect_html( (string) $html, 'szm-card-slider', szm_ha_effect_data( 'slider', $a, 'query' ) );
 }, 10, 2 );
 
 /**

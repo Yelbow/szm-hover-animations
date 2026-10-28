@@ -500,7 +500,7 @@
 .szm-card-slider-viewport.is-slepen { cursor: grabbing; user-select: none; }
 .szm-card-slider-viewport img { -webkit-user-drag: none; user-drag: none; }
 .szm-card-slider.szm-card-slider--ready {
-	--szm-per-view: 3;
+	--szm-per-view: var( --szm-perbeeld, 3 );
 	--szm-gap: var(--wp--preset--spacing--40, 1.5rem);
 	display: flex !important;
 	flex-wrap: nowrap !important;
@@ -512,14 +512,26 @@
 	transition: transform var(--szm-speed, 500ms) cubic-bezier(.4, 0, .2, 1);
 	will-change: transform;
 }
+/* Breedte per kaart. De tweede regel is expres extra specifiek: WordPress zet
+   op schermen onder 781 px `flex-basis: 100% !important` op .wp-block-column,
+   en dat wint anders van deze regel (kolommen als slider). */
+.szm-card-slider.szm-card-slider--ready > .szm-card-slider-item,
+.szm-card-slider.szm-card-slider--ready > .szm-card-slider-item.wp-block-column {
+	flex: 0 0 calc( ( 100% - var(--szm-gap) * ( var(--szm-per-view) - 1 ) ) / var(--szm-per-view) ) !important;
+	max-width: none !important;
+	margin: 0 !important;
+	box-sizing: border-box;
+}
 .szm-card-slider.szm-card-slider--ready > * {
 	flex: 0 0 calc( ( 100% - var(--szm-gap) * ( var(--szm-per-view) - 1 ) ) / var(--szm-per-view) ) !important;
 	max-width: none !important;
 	margin: 0 !important;
 	box-sizing: border-box;
 }
-@media ( max-width: 899px ) { .szm-card-slider.szm-card-slider--ready { --szm-per-view: 2; } }
-@media ( max-width: 599px ) { .szm-card-slider.szm-card-slider--ready { --szm-per-view: 1.25; --szm-gap: 1rem; } }
+/* Kleiner scherm: maximaal 2 en daarna 1,25 per beeld (de volgende kaart steekt uit).
+   Staat er een vast aantal per beeld op het blok (Kolommen: 1), dan wint dat. */
+@media ( max-width: 899px ) { .szm-card-slider.szm-card-slider--ready { --szm-per-view: min( 2, var( --szm-perbeeld, 2 ) ); } }
+@media ( max-width: 599px ) { .szm-card-slider.szm-card-slider--ready { --szm-per-view: min( 1.25, var( --szm-perbeeld, 1.25 ) ); --szm-gap: 1rem; } }
 .szm-card-slider-arrow {
 	position: absolute; top: 40%; transform: translateY(-50%); z-index: 2;
 	width: 2.5rem; height: 2.5rem; border-radius: 50%; border: 1px solid currentColor;
@@ -528,7 +540,62 @@
 }
 .szm-card-slider-prev { left: calc( var( --szm-bleed-l, 0px ) - 1.25rem ); }
 .szm-card-slider-next { right: calc( var( --szm-bleed-r, 0px ) - 1.25rem ); }
+/* Loop uit: aan het begin/eind is er geen volgende of vorige kaart meer. */
+.szm-card-slider-arrow.is-uit,
+.szm-card-slider-arrow:disabled { opacity: 0.35; cursor: default; }
 @media ( max-width: 599px ) { .szm-card-slider-arrow { display: none; } }
 .szm-card-slider-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 1rem; }
 .szm-card-slider-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; border: 1px solid currentColor; background: transparent; padding: 0; cursor: pointer; }
 .szm-card-slider-dot.is-active { background: currentColor; }
+
+/* Hulptekst als info-icoontje in de editor (zie verstopHelp() in editor.js):
+   de grijze regel onder een veld wordt verborgen en dezelfde tekst verschijnt
+   pas bij hover of toetsenbordfocus. */
+.components-base-control__help.szm-ha-help { display: none !important; }
+.szm-ha-info {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	margin-left: 0.35rem;
+	cursor: help;
+	vertical-align: middle;
+}
+.szm-ha-info__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 15px;
+	height: 15px;
+	border: 1px solid currentColor;
+	border-radius: 50%;
+	font-size: 10px;
+	font-style: normal;
+	font-weight: 600;
+	line-height: 1;
+	opacity: 0.55;
+}
+.szm-ha-info:hover .szm-ha-info__icon,
+.szm-ha-info:focus .szm-ha-info__icon { opacity: 1; }
+.szm-ha-info__tip {
+	display: none;
+	position: absolute;
+	left: 50%;
+	top: 150%;
+	transform: translateX(-50%);
+	width: 250px;
+	padding: 0.5rem 0.6rem;
+	background: #1e1e1e;
+	color: #fff;
+	border-radius: 4px;
+	font-size: 12px;
+	font-weight: 400;
+	line-height: 1.45;
+	letter-spacing: 0;
+	text-transform: none;
+	text-align: left;
+	z-index: 100000;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.szm-ha-info:hover .szm-ha-info__tip,
+.szm-ha-info:focus .szm-ha-info__tip,
+.szm-ha-info:focus-within .szm-ha-info__tip { display: block; }

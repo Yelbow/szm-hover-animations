@@ -13,7 +13,13 @@
 
 	var cfg = Object.assign( { threshold: 3, autoplay: 5, speed: 500 }, window.szmCardSlider || {} );
 	var reduced = window.matchMedia && window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
-	var K = 4; // kopieën aan elk uiteinde, genoeg voor 3 in beeld plus het uitstekende kaartje
+	// Zelfde presets als de Easing-keuze in de editor (EASE_CSS_MAP in editor.js).
+	var EASE_CSS = {
+		smooth: 'ease',
+		snappy: 'cubic-bezier(0.22, 1, 0.36, 1)',
+		bouncy: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+		linear: 'linear'
+	};
 
 	function num( v, d ) { var x = parseFloat( v ); return isNaN( x ) ? d : x; }
 
@@ -22,8 +28,26 @@
 		var n = items.length;
 		var grens = num( list.getAttribute( 'data-szm-grens' ), cfg.threshold );
 		if ( n <= grens || n < 2 ) { return; }
-		var seconds = num( list.getAttribute( 'data-szm-seconden' ), cfg.autoplay );
+		// Automatisch doorschuiven staat standaard aan; alleen data-szm-autoplay="0"
+		// zet het uit (Jelle 28-10).
+		var autoplayAan = list.getAttribute( 'data-szm-autoplay' ) !== '0';
+		var seconds = autoplayAan ? num( list.getAttribute( 'data-szm-seconden' ), cfg.autoplay ) : 0;
 		var speed = num( list.getAttribute( 'data-szm-snelheid' ), cfg.speed );
+		var loop = list.getAttribute( 'data-szm-loop' ) !== '0';
+		var ease = list.getAttribute( 'data-szm-ease' ) || 'smooth';
+		// Vast aantal kaarten per beeld (Kolommen: 1). Leeg = de CSS-staffel
+		// 3 / 2 / 1,25.
+		var perbeeld = num( list.getAttribute( 'data-szm-perbeeld' ), 0 );
+		if ( perbeeld > 0 ) {
+			list.style.setProperty( '--szm-perbeeld', perbeeld );
+		}
+		var K = loop ? 4 : 0; // kopieën aan elk uiteinde, genoeg voor 3 in beeld plus het uitstekende kaartje
+
+		// Eigen klasse op elk kind: WordPress zet op smalle schermen
+		// flex-basis: 100% !important op .wp-block-column, en die wint van een
+		// regel met minder klassen. Met deze klasse erbij is de onze
+		// specifieker (zie style.css).
+		items.forEach( function ( item ) { item.classList.add( 'szm-card-slider-item' ); } );
 
 		var outer = document.createElement( 'div' );
 		outer.className = 'szm-card-slider-wrapper';
@@ -39,6 +63,7 @@
 		list.classList.add( 'szm-card-slider--ready' );
 		zetBleed( Math.max( 0, Math.round( beginStand.left ) ), Math.max( 0, Math.round( window.innerWidth - beginStand.right ) ) );
 		list.style.setProperty( '--szm-speed', ( reduced ? 0 : speed ) + 'ms' );
+		list.style.transitionTimingFunction = EASE_CSS[ ease ] || EASE_CSS.smooth;
 		outer.setAttribute( 'role', 'region' );
 		outer.setAttribute( 'aria-roledescription', 'carrousel' );
 		outer.setAttribute( 'tabindex', '0' );
@@ -117,11 +142,30 @@
 		}
 		function normaliseer() {
 			window.clearTimeout( vangnet );
-			if ( idx < 0 || idx >= n ) { idx = ( ( idx % n ) + n ) % n; zet( basis( idx ), false ); }
-			bezig = false; markeer();
+			if ( loop ) {
+				if ( idx < 0 || idx >= n ) { idx = ( ( idx % n ) + n ) % n; zet( basis( idx ), false ); }
+			} else if ( idx < 0 || idx > n - 1 ) {
+				idx = Math.max( 0, Math.min( n - 1, idx ) );
+				zet( basis( idx ), false );
+			}
+			bezig = false; markeer(); zetPijlen();
+		}
+		// Zonder loop stopt hij bij de laatste kaart: pijltjes die nergens meer
+		// heen kunnen, gaan uit.
+		function zetPijlen() {
+			if ( loop ) {
+				prev.disabled = false; next.disabled = false;
+				prev.classList.remove( 'is-uit' ); next.classList.remove( 'is-uit' );
+				return;
+			}
+			prev.disabled = idx <= 0;
+			next.disabled = idx >= n - 1;
+			prev.classList.toggle( 'is-uit', prev.disabled );
+			next.classList.toggle( 'is-uit', next.disabled );
 		}
 		function go( i, animeer ) {
 			if ( bezig ) { return; }
+			if ( ! loop ) { i = Math.max( 0, Math.min( n - 1, i ) ); }
 			idx = i;
 			if ( animeer && speed > 0 && ! reduced ) {
 				bezig = true;
@@ -137,7 +181,11 @@
 
 		function start() {
 			if ( reduced || seconds <= 0 || timer ) { return; }
-			timer = window.setInterval( function () { go( idx + 1, true ); }, seconds * 1000 );
+			if ( ! loop && idx >= n - 1 ) { return; }
+			timer = window.setInterval( function () {
+				if ( ! loop && idx >= n - 1 ) { stop(); return; }
+				go( idx + 1, true );
+			}, seconds * 1000 );
 		}
 		function stop() { if ( timer ) { window.clearInterval( timer ); timer = null; } }
 

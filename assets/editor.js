@@ -49,6 +49,9 @@
 	// hun eigen attribute (szmGsapVideoEffect/szmGsapText) staan.
 	var GSAP_COLUMNS_OPTIONS_MAP = settings.gsapColumnsOptions || {};
 	var GSAP_GROUP_OPTIONS_MAP   = settings.gsapGroupOptions || {};
+	// Sinds v1.18.0 één lijst voor Kolommen, Rij en Query Loop (Jelle 28-10:
+	// "een en dezelfde functionaliteit met alle functionaliteit er in").
+	var EFFECT_OPTIONS_MAP       = settings.gsapEffectOptions || GSAP_COLUMNS_OPTIONS_MAP;
 	var EASING_OPTIONS_MAP       = settings.easingOptions || {};
 	var PIN_START_OPTIONS_MAP    = settings.pinStartOptions || {};
 	var LOOP_DELAY_OPTIONS_MAP   = settings.loopDelayOptions || {};
@@ -79,7 +82,8 @@
 		'core/social-links',
 	];
 	var DEFAULT_SLIDER_SPEED     = 500;  // ms, overgangssnelheid tussen slides
-	var DEFAULT_SLIDER_AUTOPLAY_SPEED = 4000; // ms
+	var DEFAULT_SLIDER_AUTOPLAY_SPEED = 4000; // ms (oude kolommen-slider)
+	var DEFAULT_SLIDER_AUTOPLAY_SECONDS = 5;  // seconden per kaart (kaartenslider)
 	var DEFAULT_ACCORDION_SPEED  = 400;  // ms
 	var DEFAULT_VIDEO_SPEED      = 20;   // parallax: % verschuiving, reveal/play: ms
 	var DEFAULT_TEXT_STAGGER     = 30;   // ms tussen elke letter/woord/regel
@@ -348,12 +352,19 @@
 			extra.szmGsapProcessScrollLength = { type: 'number', default: DEFAULT_PROCESS_SCROLL_LENGTH };
 		}
 
-		// Kaartenslider: een optie in de Effect-dropdown van "Scroll & interactie".
-		if ( name === 'core/query' || groupFamily ) {
+		// Slider (v1.18.0): één motor (de kaartenslider) voor Kolommen, Rij en
+		// Query Loop. Leeg/afwezig = de standaard (CSS-staffel of Instellingen >
+		// Kaartenslider), zodat bestaande blokken geldig blijven en niemand
+		// waarden hoeft over te typen.
+		if ( columnsFamily || groupFamily || name === 'core/query' ) {
 			extra.szmSlider         = { type: 'boolean', default: false };
-			extra.szmSliderGrens    = { type: 'string', default: '' };
-			extra.szmSliderSeconden = { type: 'string', default: '' };
-			extra.szmSliderSnelheid = { type: 'string', default: '' };
+			extra.szmSliderPerBeeld = { type: 'number' };
+			extra.szmSliderGrens    = { type: 'number' };
+			extra.szmSliderSeconden = { type: 'number' };
+			extra.szmSliderSnelheid = { type: 'number' };
+			// Automatisch doorschuiven staat standaard aan (Jelle 28-10).
+			extra.szmSliderAutoplay = { type: 'boolean', default: true };
+			extra.szmSliderLoop     = { type: 'boolean', default: true };
 		}
 		if ( columnsFamily || groupFamily || videoFamily ) {
 			// Wanneer een gepind scroll-effect begint met pinnen (los van de
@@ -608,31 +619,31 @@
 			// Welk effect toont de GSAP-dropdown als geselecteerd: het nieuwe
 			// szmGsapEffect-attribute als dat al is aangeraakt, anders afgeleid
 			// uit de oude losse toggles (zie legacyColumnsEffect/legacyGroupEffect).
-			var columnsEffect = showColumnsFamily ? ( attributes.szmGsapEffect || legacyColumnsEffect( attributes ) ) : '';
-			var groupEffect    = ( showGroupFamily || isQueryBlock )
-				? ( attributes.szmGsapEffect || ( attributes.szmSlider ? 'cardslider' : legacyGroupEffect( attributes ) ) )
-				: '';
+			// Eén effect-waarde voor alle drie de bloktypes. 'cardslider' is de
+			// oude naam van dezelfde motor (v1.17) en wordt hier naar 'slider'
+			// vertaald, zodat de dropdown overal dezelfde optie toont zonder dat
+			// opgeslagen content aangepast hoeft te worden.
+			var rawEffect = '';
+			if ( showColumnsFamily ) {
+				rawEffect = attributes.szmGsapEffect || legacyColumnsEffect( attributes );
+			} else if ( showGroupFamily || isQueryBlock ) {
+				rawEffect = attributes.szmGsapEffect || ( attributes.szmSlider ? 'slider' : legacyGroupEffect( attributes ) );
+			}
+			var effectValue = rawEffect === 'cardslider' ? 'slider' : rawEffect;
 
-			function handleColumnsEffectChange( value ) {
-				// Zet de oude toggles altijd expliciet uit zodra de nieuwe dropdown
-				// wordt aangeraakt (ook bij "Geen") — anders zou een latere lezing
-				// via de legacy-fallback een net uitgezet effect weer "aanzetten".
+			function handleEffectChange( value ) {
+				// Zet de oude toggles altijd expliciet uit zodra de dropdown
+				// wordt aangeraakt (ook bij "Geen") — anders zou een latere
+				// lezing via de legacy-fallback een net uitgezet effect weer
+				// "aanzetten".
 				setAttributes( {
 					szmGsapEffect: value,
 					szmGsapSlider: false,
 					szmGsapProcess: false,
-				} );
-			}
-
-			function handleGroupEffectChange( value ) {
-				setAttributes( {
-					szmGsapEffect: value,
 					szmGsapAccordion: false,
 					szmGsapHorizontal: false,
 					szmGsapFullpage: false,
-					// De kaartenslider werkt op de bestaande szmSlider-attributen (die de
-					// website al gebruikt), dus de dropdown zet die mee aan en uit.
-					szmSlider: value === 'cardslider',
+					szmSlider: value === 'slider',
 				} );
 			}
 
@@ -648,6 +659,80 @@
 						setAttributes( { szmGsapEasing: value } );
 					},
 				} );
+			}
+
+			/**
+			 * Instellingen van de slider (v1.18.0): één set voor Kolommen, Rij
+			 * en Query Loop, in dezelfde volgorde als het paneel dat Jelle kent.
+			 */
+			function sliderControls() {
+				var perBeeldStandaard = showColumnsFamily ? 1 : 3;
+				return el(
+					Fragment,
+					null,
+					el( RangeControl, {
+						label: __( 'Kaarten per beeld', 'szm-hover-animations' ),
+						help: showColumnsFamily
+							? __( 'Standaard 1 kolom per beeld.', 'szm-hover-animations' )
+							: __( 'Standaard 3 op bureaublad, 2 op tablet, 1,25 op mobiel (de volgende kaart steekt dan uit).', 'szm-hover-animations' ),
+						value: attributes.szmSliderPerBeeld || perBeeldStandaard,
+						onChange: function ( value ) {
+							setAttributes( { szmSliderPerBeeld: value } );
+						},
+						min: 1,
+						max: 4,
+						step: 1,
+					} ),
+					// De grens alleen op de Query Loop: daar hangt het aantal
+					// kaarten van de query af. Kies je op een Rij of Kolommen
+					// zelf voor de slider, dan slidet hij altijd.
+					isQueryBlock && el( RangeControl, {
+						label: __( 'Grens (aantal kaarten)', 'szm-hover-animations' ),
+						help: __( 'Meer kaarten dan dit en het wordt een slider. Leeg = standaard (3).', 'szm-hover-animations' ),
+						value: attributes.szmSliderGrens || 3,
+						onChange: function ( value ) {
+							setAttributes( { szmSliderGrens: value } );
+						},
+						min: 1,
+						max: 12,
+						step: 1,
+					} ),
+					el( RangeControl, {
+						label: __( 'Overgangssnelheid (ms)', 'szm-hover-animations' ),
+						value: attributes.szmSliderSnelheid || DEFAULT_SLIDER_SPEED,
+						onChange: function ( value ) {
+							setAttributes( { szmSliderSnelheid: value } );
+						},
+						min: 100,
+						max: 1500,
+						step: 50,
+					} ),
+					easingControl(),
+					el( ToggleControl, {
+						label: __( 'Loop (na laatste slide terug naar eerste)', 'szm-hover-animations' ),
+						checked: attributes.szmSliderLoop !== false,
+						onChange: function ( value ) {
+							setAttributes( { szmSliderLoop: value } );
+						},
+					} ),
+					el( ToggleControl, {
+						label: __( 'Automatisch doorschuiven', 'szm-hover-animations' ),
+						checked: attributes.szmSliderAutoplay !== false,
+						onChange: function ( value ) {
+							setAttributes( { szmSliderAutoplay: value } );
+						},
+					} ),
+					attributes.szmSliderAutoplay !== false && el( RangeControl, {
+						label: __( 'Seconden per kaart', 'szm-hover-animations' ),
+						value: attributes.szmSliderSeconden || DEFAULT_SLIDER_AUTOPLAY_SECONDS,
+						onChange: function ( value ) {
+							setAttributes( { szmSliderSeconden: value } );
+						},
+						min: 1,
+						max: 20,
+						step: 1,
+					} )
+				);
 			}
 
 			function pinStartControl() {
@@ -942,73 +1027,22 @@
 						{ title: __( 'Scroll & interactie', 'szm-hover-animations' ), initialOpen: false },
 						positionNotice,
 
-						// core/columns: slider of sticky proces-stappen.
-						showColumnsFamily && el( SelectControl, {
+						// Eén Effect-lijst voor Kolommen, Rij en Query Loop, met
+						// dezelfde instellingen eronder (Jelle 28-10).
+						el( SelectControl, {
 							label: __( 'Effect', 'szm-hover-animations' ),
-							value: columnsEffect,
-							options: mapToOptions( GSAP_COLUMNS_OPTIONS_MAP ),
-							onChange: handleColumnsEffectChange,
-							// Slider en proces-stappen gaan niet samen met een anker.
+							value: effectValue,
+							options: mapToOptions( EFFECT_OPTIONS_MAP ),
+							onChange: handleEffectChange,
+							// Een slider of pin-effect vecht met een absolute positie.
 							disabled: positionConflict,
 						} ),
-						showColumnsFamily && previewFor( columnsEffect && 'columns-' + columnsEffect ),
-						showColumnsFamily && columnsEffect === 'slider' && el( RangeControl, {
-							label: __( 'Overgangssnelheid (ms)', 'szm-hover-animations' ),
-							value: attributes.szmGsapSliderSpeed || DEFAULT_SLIDER_SPEED,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapSliderSpeed: value } );
-							},
-							min: 100,
-							max: 1500,
-							step: 50,
-						} ),
-						showColumnsFamily && columnsEffect === 'slider' && easingControl(),
-						showColumnsFamily && columnsEffect === 'slider' && el( ToggleControl, {
-							label: __( 'Loop (na laatste slide terug naar eerste)', 'szm-hover-animations' ),
-							checked: attributes.szmGsapSliderLoop !== false,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapSliderLoop: value } );
-							},
-						} ),
-						showColumnsFamily && columnsEffect === 'slider' && el( ToggleControl, {
-							label: __( 'Automatisch doorschuiven', 'szm-hover-animations' ),
-							checked: !! attributes.szmGsapSliderAutoplay,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapSliderAutoplay: value } );
-							},
-						} ),
-						showColumnsFamily && columnsEffect === 'slider' && !! attributes.szmGsapSliderAutoplay && el( RangeControl, {
-							label: __( 'Tijd per slide (ms)', 'szm-hover-animations' ),
-							value: attributes.szmGsapSliderAutoplaySpeed || DEFAULT_SLIDER_AUTOPLAY_SPEED,
-							onChange: function ( value ) {
-								setAttributes( { szmGsapSliderAutoplaySpeed: value } );
-							},
-							min: 1500,
-							max: 10000,
-							step: 500,
-						} ),
-						showColumnsFamily && columnsEffect === 'process' && pinStartControl(),
-						showColumnsFamily && columnsEffect === 'process' && processScrollLengthControl(),
-						showColumnsFamily && columnsEffect === 'process' && lockAndCenterControls(),
-						showColumnsFamily && columnsEffect === 'process' && el( 'p', { className: 'components-base-control__help' },
-							__( 'Bij 2+ kolommen blijft de eerste (bv. afbeelding) vastgepind staan terwijl de directe kind-blokken in de tweede kolom één voor één inklappen. Bij 1 kolom pint de kolom zelf en klappen haar eigen kind-blokken in. Niet live zichtbaar in de editor, alleen op de front-end/preview.', 'szm-hover-animations' )
-						),
+						previewFor( effectValue && ( showColumnsFamily ? 'columns-' : 'group-' ) + effectValue ),
+						effectValue === 'slider' && sliderControls(),
 
-						// core/group: accordion, horizontal scroll of full-viewport slides.
-						( showGroupFamily || isQueryBlock ) && el( SelectControl, {
-							label: __( 'Effect', 'szm-hover-animations' ),
-							value: groupEffect,
-							options: isQueryBlock
-								? mapToOptions( { '': __( 'Geen', 'szm-hover-animations' ), cardslider: __( 'Kaartenslider (oneindig doorbladeren)', 'szm-hover-animations' ) } )
-								: mapToOptions( GSAP_GROUP_OPTIONS_MAP ),
-							onChange: handleGroupEffectChange,
-							// Horizontaal scrollen en full-viewport slides pinnen; accordion
-							// zet een eigen wrapper om de kinderen. Geen van drieën samen met
-							// een anker.
-							disabled: positionConflict,
-						} ),
-						( showGroupFamily || isQueryBlock ) && previewFor( groupEffect && 'group-' + groupEffect ),
-						showGroupFamily && groupEffect === 'accordion' && el( RangeControl, {
+						// De instellingen per effect staan hieronder; ze gelden nu
+						// voor elk bloktype, niet alleen voor een Rij.
+						effectValue === 'accordion' && el( RangeControl, {
 							label: __( 'Snelheid (ms)', 'szm-hover-animations' ),
 							value: attributes.szmGsapAccordionSpeed || DEFAULT_ACCORDION_SPEED,
 							onChange: function ( value ) {
@@ -1018,15 +1052,15 @@
 							max: 1000,
 							step: 50,
 						} ),
-						showGroupFamily && groupEffect === 'accordion' && easingControl(),
-						showGroupFamily && groupEffect === 'accordion' && el( ToggleControl, {
+						effectValue === 'accordion' && easingControl(),
+						effectValue === 'accordion' && el( ToggleControl, {
 							label: __( 'Meerdere panelen tegelijk open toestaan', 'szm-hover-animations' ),
 							checked: !! attributes.szmGsapAccordionMultiple,
 							onChange: function ( value ) {
 								setAttributes( { szmGsapAccordionMultiple: value } );
 							},
 						} ),
-						showGroupFamily && groupEffect === 'accordion' && el( RangeControl, {
+						effectValue === 'accordion' && el( RangeControl, {
 							label: __( 'Standaard geopend paneel (-1 = alles dicht)', 'szm-hover-animations' ),
 							value: typeof attributes.szmGsapAccordionDefaultOpen === 'number' ? attributes.szmGsapAccordionDefaultOpen : -1,
 							onChange: function ( value ) {
@@ -1036,7 +1070,7 @@
 							max: 10,
 							step: 1,
 						} ),
-						showGroupFamily && groupEffect === 'horizontal' && el( SelectControl, {
+						effectValue === 'horizontal' && el( SelectControl, {
 							label: __( 'Weergave', 'szm-hover-animations' ),
 							value: attributes.szmGsapHorizontalMode || 'scroll',
 							options: mapToOptions( HORIZONTAL_MODE_OPTIONS_MAP ),
@@ -1044,12 +1078,12 @@
 								setAttributes( { szmGsapHorizontalMode: value } );
 							},
 						} ),
-						showGroupFamily && groupEffect === 'horizontal' && pinStartControl(),
-						showGroupFamily && groupEffect === 'horizontal' && lockAndCenterControls(),
-						showGroupFamily && groupEffect === 'horizontal' && el( 'p', { className: 'components-base-control__help' },
+						effectValue === 'horizontal' && pinStartControl(),
+						effectValue === 'horizontal' && lockAndCenterControls(),
+						effectValue === 'horizontal' && el( 'p', { className: 'components-base-control__help' },
 							__( 'Pint deze Group vast en scrollt zijn directe kind-blokken horizontaal mee met verticaal scrollen ("Zijwaarts scrollen"), of stapelt ze als kaarten op elkaar zonder zijwaartse beweging ("Stapelen"). Niet live zichtbaar in de editor.', 'szm-hover-animations' )
 						),
-						showGroupFamily && groupEffect === 'fullpage' && el( SelectControl, {
+						effectValue === 'fullpage' && el( SelectControl, {
 							label: __( 'Overgangsstijl', 'szm-hover-animations' ),
 							value: attributes.szmGsapFullpageTransition || 'fade',
 							options: mapToOptions( FULLPAGE_TRANSITION_OPTIONS_MAP ),
@@ -1057,38 +1091,15 @@
 								setAttributes( { szmGsapFullpageTransition: value } );
 							},
 						} ),
-						showGroupFamily && groupEffect === 'fullpage' && lockHeadingControl(),
-						showGroupFamily && groupEffect === 'fullpage' && el( 'p', { className: 'components-base-control__help' },
+						effectValue === 'fullpage' && lockHeadingControl(),
+						effectValue === 'fullpage' && el( 'p', { className: 'components-base-control__help' },
 							__( 'Elk direct kind-blok wordt een volledig-scherm paneel; scrollen wisselt naar het volgende paneel volgens de gekozen overgangsstijl. Begint altijd direct bovenaan (geen "wanneer begint pinnen"-keuze) — anders past het paneel niet meer op het volledige scherm. Niet live zichtbaar in de editor.', 'szm-hover-animations' )
 						),
-						( showGroupFamily || isQueryBlock ) && groupEffect === 'cardslider' && el( 'div', { style: { display: 'grid', gap: '12px', margin: '12px 0' } },
-							el( TextControl, {
-								type: 'number', min: 0, label: __( 'Grens (aantal kaarten)', 'szm-hover-animations' ),
-								help: __( 'Meer kaartjes dan dit en het wordt een slider. Leeg = standaard.', 'szm-hover-animations' ),
-								placeholder: '3', value: attributes.szmSliderGrens || '',
-								__nextHasNoMarginBottom: true, __next40pxDefaultSize: true,
-								onChange: function ( value ) { setAttributes( { szmSliderGrens: value } ); },
-							} ),
-							el( TextControl, {
-								type: 'number', min: 0, label: __( 'Seconden per kaart', 'szm-hover-animations' ),
-								help: __( 'Automatisch doorgaan. 0 = niet automatisch. Leeg = standaard.', 'szm-hover-animations' ),
-								placeholder: '5', value: attributes.szmSliderSeconden || '',
-								__nextHasNoMarginBottom: true, __next40pxDefaultSize: true,
-								onChange: function ( value ) { setAttributes( { szmSliderSeconden: value } ); },
-							} ),
-							el( TextControl, {
-								type: 'number', min: 0, label: __( 'Overgangssnelheid (ms)', 'szm-hover-animations' ),
-								help: __( 'Hoe snel de kaarten verschuiven. Leeg = standaard.', 'szm-hover-animations' ),
-								placeholder: '500', value: attributes.szmSliderSnelheid || '',
-								__nextHasNoMarginBottom: true, __next40pxDefaultSize: true,
-								onChange: function ( value ) { setAttributes( { szmSliderSnelheid: value } ); },
-							} )
-						),
-						showGroupFamily && groupEffect === 'process' && pinStartControl(),
-						showGroupFamily && groupEffect === 'process' && processScrollLengthControl(),
-						showGroupFamily && groupEffect === 'process' && lockAndCenterControls(),
-						showGroupFamily && groupEffect === 'process' && el( 'p', { className: 'components-base-control__help' },
-							__( 'Elk direct kind-blok van deze Group is één stap: het eerste element erin blijft zichtbaar als "header", de rest klapt in tijdens scrollen (zelfde vorm als Accordion-panelen). De hele Group pint tijdens dat inklappen. Niet live zichtbaar in de editor.', 'szm-hover-animations' )
+						effectValue === 'process' && pinStartControl(),
+						effectValue === 'process' && processScrollLengthControl(),
+						effectValue === 'process' && lockAndCenterControls(),
+						effectValue === 'process' && el( 'p', { className: 'components-base-control__help' },
+							__( 'Elk direct kind-blok van dit blok is één stap: het eerste element erin blijft zichtbaar als "header", de rest klapt in tijdens scrollen (zelfde vorm als Accordion-panelen). Het hele blok pint tijdens dat inklappen. Niet live zichtbaar in de editor.', 'szm-hover-animations' )
 						),
 
 						// core/video, core/cover.
@@ -1266,7 +1277,11 @@
 		// core/group: accordion, horizontal scroll, full-viewport slides of
 		// proces-stappen — zelfde patroon, fallback op de oude toggles via
 		// legacyGroupEffect (process heeft geen legacy boolean, is nieuw).
-		if ( isGroupFamily( name ) ) {
+		// Kolommen hebben dezelfde effectenlijst (v1.18.0) en gebruiken voor
+		// accordion/horizontal/fullpage exact deze opbouw, zodat de opgeslagen
+		// markup gelijk blijft aan die van een Rij.
+		var columnsEffectVoorGroep = isColumnsFamily( name ) ? ( attributes.szmGsapEffect || legacyColumnsEffect( attributes ) ) : '';
+		if ( isGroupFamily( name ) || 'accordion' === columnsEffectVoorGroep || 'horizontal' === columnsEffectVoorGroep || 'fullpage' === columnsEffectVoorGroep ) {
 			var groupEffect = attributes.szmGsapEffect || legacyGroupEffect( attributes );
 
 			if ( groupEffect === 'accordion' ) {
@@ -1412,4 +1427,69 @@
 		'szm-hover-animations/add-preview',
 		withAnimationPreview
 	);
+
+	/**
+	 * Hulpteksten (tooltips) van onze panelen achter een info-icoontje met hover,
+	 * in plaats van een grijze regel onder elk veld (Jelle 28-10). Alleen onze
+	 * eigen panelen: andere plugins houden hun eigen hulpteksten.
+	 */
+	var ONZE_PANELEN = [ 'Hover animatie', 'Entrance animatie', 'Scroll & interactie', 'Animatie via ouder-blok' ];
+
+	function verstopHelp() {
+		document.querySelectorAll( '.components-panel__body' ).forEach( function ( paneel ) {
+			var titel = paneel.querySelector( '.components-panel__body-title' );
+			if ( ! titel || ONZE_PANELEN.indexOf( titel.textContent.trim() ) === -1 ) {
+				return;
+			}
+			paneel.querySelectorAll( '.components-base-control__help' ).forEach( function ( hulp ) {
+				if ( hulp.dataset.szmTip ) {
+					return;
+				}
+				var label = hulp.closest( '.components-base-control' ) &&
+					hulp.closest( '.components-base-control' ).querySelector( '.components-base-control__label' );
+				var tekst = hulp.textContent.trim();
+				if ( ! label || ! tekst ) {
+					return;
+				}
+				hulp.dataset.szmTip = '1';
+				hulp.classList.add( 'szm-ha-help' );
+
+				var tip = document.createElement( 'span' );
+				tip.className = 'szm-ha-info';
+				tip.tabIndex = 0;
+				tip.setAttribute( 'role', 'note' );
+				tip.setAttribute( 'aria-label', tekst );
+
+				var ico = document.createElement( 'span' );
+				ico.className = 'szm-ha-info__icon';
+				ico.setAttribute( 'aria-hidden', 'true' );
+				ico.textContent = 'i';
+
+				var tekstblok = document.createElement( 'span' );
+				tekstblok.className = 'szm-ha-info__tip';
+				tekstblok.textContent = tekst;
+
+				tip.appendChild( ico );
+				tip.appendChild( tekstblok );
+				label.appendChild( tip );
+			} );
+		} );
+	}
+
+	var helpGepland = false;
+	function planHelp() {
+		if ( helpGepland ) {
+			return;
+		}
+		helpGepland = true;
+		window.setTimeout( function () {
+			helpGepland = false;
+			verstopHelp();
+		}, 120 );
+	}
+
+	if ( document.body ) {
+		new MutationObserver( planHelp ).observe( document.body, { childList: true, subtree: true } );
+		planHelp();
+	}
 } )( window.wp, window.szmHoverAnimations );

@@ -208,9 +208,14 @@
 	 * Slider: applies to .szm-gsap-slider (core/columns). Each direct child
 	 * column becomes a full-width slide; container gets prev/next arrows and
 	 * dot navigation, with optional autoplay/loop.
+	 *
+	 * Sinds v1.18.0 doet de kaartenslider (.szm-card-slider) dit werk op alle
+	 * bloktypes. Een blok dat beide klassen heeft (opgeslagen content van vóór
+	 * v1.18.0) laten we hier met rust, anders initialiseren er twee sliders op
+	 * hetzelfde element.
 	 */
 	function initSliders() {
-		var containers = document.querySelectorAll( '.szm-gsap-slider' );
+		var containers = document.querySelectorAll( '.szm-gsap-slider:not(.szm-card-slider)' );
 		if ( ! containers.length ) {
 			return;
 		}
