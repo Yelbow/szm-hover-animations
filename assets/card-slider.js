@@ -32,12 +32,12 @@
 		// Vóór het ombouwen meten waar de kaartjes nu staan: dat is de afstand tot de
 		// schermrand, en die ruimte mag de slider gebruiken (bleed) zodat een half
 		// zichtbare kaart door de schermrand wordt afgesneden en niet door de padding.
-		var start = list.getBoundingClientRect();
+		var beginStand = list.getBoundingClientRect();
 		list.parentNode.insertBefore( outer, list );
 		outer.appendChild( viewport );
 		viewport.appendChild( list );
 		list.classList.add( 'szm-card-slider--ready' );
-		zetBleed( Math.max( 0, Math.round( start.left ) ), Math.max( 0, Math.round( window.innerWidth - start.right ) ) );
+		zetBleed( Math.max( 0, Math.round( beginStand.left ) ), Math.max( 0, Math.round( window.innerWidth - beginStand.right ) ) );
 		list.style.setProperty( '--szm-speed', ( reduced ? 0 : speed ) + 'ms' );
 		outer.setAttribute( 'role', 'region' );
 		outer.setAttribute( 'aria-roledescription', 'carrousel' );
