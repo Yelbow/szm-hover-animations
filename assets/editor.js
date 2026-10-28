@@ -481,7 +481,7 @@
 			var showGsapMarquee = isGsapMarqueeSupported( name );
 			var showCardSlider = isCardSliderSupported( name );
 			var cardSliderCfg = window.szmCardSliderEditor || {};
-			var toonSliderPaneel = toonSliderPaneel && !! cardSliderCfg.canManage;
+			var toonSliderPaneel = showCardSlider && !! cardSliderCfg.canManage;
 			// Tekst-reveal en counter staan sinds v1.14.0 in het Entrance-paneel.
 			var showGsapBox = showColumnsFamily || showGroupFamily || showGsapVideo ||
 				showGsapMagnetic || showGsapMarquee;
