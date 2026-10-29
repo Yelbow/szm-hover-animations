@@ -176,19 +176,22 @@
 		// Pijltjes horen naast het beeld te staan, niet naast de titel eronder.
 		// Kaarten zonder afbeelding (of met alleen een klein logo) houden het
 		// midden van de kaart aan (Jelle 28-10).
+		// Verschillen de beelden in hoogte, dan telt het laagste beeld: het
+		// midden daarvan valt op elk beeld in de rij.
 		function zetPijlTop() {
 			var kaart = items[ 0 ];
 			if ( ! kaart ) { return; }
 			var kr = kaart.getBoundingClientRect();
 			var hr = outer.getBoundingClientRect();
 			var midden = kr.top - hr.top + kr.height / 2;
-			var img = kaart.querySelector( 'img' );
-			if ( img ) {
-				var ir = img.getBoundingClientRect();
-				if ( ir.height && ir.height >= kr.height * 0.4 ) {
-					midden = ir.top - hr.top + ir.height / 2;
-				}
-			}
+			var laagste = null;
+			items.forEach( function ( it ) {
+				var im = it.querySelector( 'img' );
+				if ( ! im ) { return; }
+				var r = im.getBoundingClientRect();
+				if ( r.height && r.height >= it.getBoundingClientRect().height * 0.4 && ( ! laagste || r.height < laagste.height ) ) { laagste = r; }
+			} );
+			if ( laagste ) { midden = laagste.top - hr.top + laagste.height / 2; }
 			outer.style.setProperty( '--szm-pijl-top', Math.round( midden ) + 'px' );
 		}
 
@@ -244,8 +247,10 @@
 			if ( reduced || seconds <= 0 || timer ) { return; }
 			if ( ! loop && idx >= n - 1 ) { return; }
 			// Kleine vertraging per slider, zodat meerdere sliders op één pagina
-			// niet exact gelijk opklikken (Jelle 28-10). Hooguit 1,8s verschil.
-			var uitstel = Math.min( mijnRij * 450, 1800 );
+			// niet exact gelijk opklikken (Jelle 28-10). Per blok instelbaar
+			// (standaard 450 ms, 0 = gelijk), hooguit vier keer die stap.
+			var stagger = num( list.getAttribute( 'data-szm-stagger' ), 450 );
+			var uitstel = Math.min( mijnRij, 4 ) * stagger;
 			timer = window.setTimeout( function () {
 				if ( ! loop && idx >= n - 1 ) { stop(); return; }
 				go( idx + 1, true );

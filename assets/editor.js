@@ -362,6 +362,7 @@
 			extra.szmSliderGrens    = { type: 'number' };
 			extra.szmSliderSeconden = { type: 'number' };
 			extra.szmSliderSnelheid = { type: 'number' };
+			extra.szmSliderStagger  = { type: 'number' };
 			// Mobiel: kaartbreedte in % (leeg = 80) en ruimte tot de schermrand
 			// in px (leeg = 0, de rij loopt dan door tot de schermrand).
 			extra.szmSliderMobiel   = { type: 'number' };
@@ -741,6 +742,17 @@
 						min: 1,
 						max: 20,
 						step: 1,
+					} ),
+					attributes.szmSliderAutoplay !== false && el( RangeControl, {
+						label: __( 'Verschil met andere sliders (ms)', 'szm-hover-animations' ),
+						help: __( '0 = alle sliders op de pagina klikken tegelijk door. 450 = elke volgende slider klikt iets later.', 'szm-hover-animations' ),
+						value: undefined === attributes.szmSliderStagger ? 450 : attributes.szmSliderStagger,
+						onChange: function ( value ) {
+							setAttributes( { szmSliderStagger: value } );
+						},
+						min: 0,
+						max: 1500,
+						step: 50,
 					} ),
 					// Mobiel: hoe breed een kaart is en hoeveel lucht er tussen
 					// kaart en schermrand zit. Samen bepalen die twee of het
